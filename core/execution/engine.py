@@ -94,6 +94,7 @@ class ExecutionEngine:
         event_router=None,
         config: EngineConfig | None = None,
         notification_engine=None,
+        reporter=None,
     ) -> None:
         """
         Args:
@@ -102,12 +103,14 @@ class ExecutionEngine:
             event_router: EventRouter per emettere eventi.
             config: Configurazione engine.
             notification_engine: NotificationEngine per notifiche multi-canale.
+            reporter: SessionReporter per report post-sessione.
         """
         self._config = config or EngineConfig()
         self._llm_query = llm_query_fn
         self._kb = knowledge_base
         self._event_router = event_router
         self._notification_engine = notification_engine
+        self._reporter = reporter
 
         self._sandbox_mgr = SandboxManager(
             sandbox_base_dir=self._config.sandbox_base_dir,
@@ -331,13 +334,38 @@ class ExecutionEngine:
 
         finally:
             # Track execution time
+            elapsed_s = (datetime.now(timezone.utc) - _start_time).total_seconds()
+            session_hours = elapsed_s / 3600.0
             try:
                 if _repo and _tenant_id:
-                    elapsed = (datetime.now(timezone.utc) - _start_time).total_seconds()
-                    session_hours = elapsed / 3600.0
                     await _repo.add_execution_time(_tenant_id, session_hours)
             except Exception as _te:
                 logger.warning("engine.time_tracking_failed", error=str(_te))
+
+            # Send session report
+            try:
+                if self._reporter and self.state:
+                    from core.execution.reporter import SessionReport
+                    progress = self.goal_graph.progress if self.goal_graph else {}
+                    report = SessionReport(
+                        session_id=run_id,
+                        license_key="",
+                        plan="",
+                        date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                        project_type="unknown",
+                        technologies=[],
+                        loc_count=0,
+                        file_count=0,
+                        duration_minutes=elapsed_s / 60.0,
+                        goals_total=self.goal_graph.size if self.goal_graph else 0,
+                        goals_completed=progress.get("done", 0),
+                        goals_failed=progress.get("failed", 0),
+                        approval_type="manual" if self._config.require_approval else "auto",
+                        errors=[self.state.error] if self.state.error else [],
+                    )
+                    await self._reporter.send(report)
+            except Exception as _re:
+                logger.warning("engine.report_failed", error=str(_re))
 
             # Cleanup sandbox
             if self._sandbox_info:

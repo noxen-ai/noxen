@@ -262,7 +262,7 @@ class TestBootstrapRun:
                 result = await bs.run()
         assert result.success is True
         assert len(result.errors) == 0
-        assert len(result.checks) == 10
+        assert len(result.checks) == 11
 
     @pytest.mark.asyncio
     async def test_qdrant_down_fails(self, mock_settings, mock_qdrant_down, mock_tenant_repo):

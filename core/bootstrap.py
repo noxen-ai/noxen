@@ -76,6 +76,7 @@ class NoxenBootstrap:
         checks.append(await self._check_github_token())
         checks.append(await self._check_exa_key())
         checks.append(await self._check_firecrawl_key())
+        checks.append(await self._check_kb_sync())
 
         errors = [
             c.message for c in checks
@@ -434,3 +435,44 @@ class NoxenBootstrap:
             ),
             required=False,
         )
+
+    async def _check_kb_sync(self) -> HealthCheckResult:
+        """Verifica se la KB locale e' sincronizzata. Se no, avvia sync in background."""
+        try:
+            from core.kb_sync import KBSync
+            import asyncio
+
+            sync = KBSync(
+                license_server_url=self._settings.license_server_url,
+                license_key=self._settings.noxen_license_key,
+                qdrant_client=self._qdrant,
+                data_dir=str(self._settings.data_dir),
+            )
+
+            needs = await sync.needs_sync()
+            if needs:
+                asyncio.create_task(sync.sync())
+                return HealthCheckResult(
+                    name="kb_sync",
+                    status="warning",
+                    message=(
+                        "KB sync avviato in background. "
+                        "Le skill globali saranno disponibili a breve."
+                    ),
+                    required=False,
+                )
+            else:
+                state = sync._load_sync_state()
+                return HealthCheckResult(
+                    name="kb_sync",
+                    status="ok",
+                    message=f"KB sincronizzata — {state.get('count', 0)} documenti",
+                    required=False,
+                )
+        except Exception as e:
+            return HealthCheckResult(
+                name="kb_sync",
+                status="warning",
+                message=f"KB sync non disponibile: {e}",
+                required=False,
+            )

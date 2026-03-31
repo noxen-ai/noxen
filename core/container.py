@@ -74,6 +74,9 @@ class NoxenContainer:
     skill_updater: Any = None
     skill_usage_tracker: Any = None
 
+    # Layer 6b — Session Reporter
+    session_reporter: Any = None
+
     # Layer 7 — Context & Orchestration
     context_gatherer: Any = None
     orchestrator: Any = None
@@ -196,6 +199,18 @@ class NoxenContainer:
             event_router=self.event_router,
         )
 
+        # Inject skill dependencies into research agent (created in Layer 3)
+        self.research_agent._skill_repo = self.skill_repository
+        self.research_agent._board_reviewer = self.skill_board_reviewer
+
+        # Layer 6b — Session Reporter
+        from core.execution.reporter import SessionReporter
+        self.session_reporter = SessionReporter(
+            license_server_url=s.license_server_url,
+            license_key=s.noxen_license_key,
+            reports_dir=str(s.data_dir / "reports"),
+        )
+
         # Layer 7 — Context & Orchestration (depend on layer 1-6)
         self.context_gatherer = ContextGatherer(
             self.knowledge_base, self.project_manager, self.skill_router,
@@ -282,6 +297,11 @@ class NoxenContainer:
 
         from api.routes import license as license_route
         license_route.init_router(
+            tenant_repository=self.tenant_repository,
+        )
+
+        from api.routes import auth_web
+        auth_web.init_router(
             tenant_repository=self.tenant_repository,
         )
 

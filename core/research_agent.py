@@ -71,6 +71,8 @@ class ResearchAgent:
         skill_builder: SkillBuilder | None = None,
         knowledge_base: Any = None,
         event_router: Any = None,
+        skill_repository: Any = None,
+        skill_board_reviewer: Any = None,
     ) -> None:
         self._github = github_client
         self._analyzer = repo_analyzer
@@ -78,6 +80,8 @@ class ResearchAgent:
         self._skill_builder = skill_builder
         self._kb = knowledge_base
         self._events = event_router
+        self._skill_repo = skill_repository
+        self._board_reviewer = skill_board_reviewer
         self._logger = get_logger("research_agent")
 
     async def research(self, request: ResearchRequest) -> ResearchResult:
@@ -146,8 +150,8 @@ class ResearchAgent:
                     "skills": len(result.skills_generated),
                 })
 
-            # Step 5: Save to KB
-            if request.auto_save and self._kb and result.skills_generated:
+            # Step 5: Save to SkillRepository (or KB fallback)
+            if request.auto_save and (self._skill_repo or self._kb) and result.skills_generated:
                 result.skills_saved = await self._save_skills(result.skills_generated)
                 await self._emit("skills_saved", {
                     "saved": result.skills_saved,
@@ -263,36 +267,80 @@ class ResearchAgent:
             self._logger.error(f"Skill building failed: {e}")
             return SkillBuildResult(errors=[str(e)])
 
-    async def _save_skills(self, skills: list[SkillDefinition]) -> int:
-        """Step 5: Salva skill nel knowledge base."""
+    async def _save_skills(
+        self, skills: list[SkillDefinition], tenant_id: str = "global"
+    ) -> int:
+        """Step 5: Salva skill nel SkillRepository con lifecycle.
+
+        Flow: crea Skill DRAFT → board review → APPROVED.
+        Fallback: salva nella KB generica se repo non disponibile.
+        """
         saved = 0
-        for skill in skills:
+        for skill_def in skills:
             try:
-                if hasattr(self._kb, "add_skill"):
-                    await self._kb.add_skill({
-                        "name": skill.name,
-                        "description": skill.description,
-                        "category": skill.category,
-                        "tags": skill.tags,
-                        "content": skill.content,
-                        "source_repos": skill.source_repos,
-                        "source_urls": skill.source_urls,
-                        "confidence": skill.confidence,
-                    })
-                    saved += 1
-                elif hasattr(self._kb, "add"):
-                    await self._kb.add(
-                        f"skill:{skill.name}",
-                        skill.content,
-                        metadata={
-                            "name": skill.name,
-                            "category": skill.category,
-                            "tags": ",".join(skill.tags),
-                        },
+                if self._skill_repo:
+                    # Usa SkillRepository con lifecycle completo
+                    from core.skills.lifecycle import (
+                        Skill, SkillStatus, SkillSource, SkillMetrics,
                     )
+                    skill_id = f"skill_{skill_def.name}_{tenant_id}".replace(" ", "_").lower()
+                    skill = Skill(
+                        id=skill_id,
+                        name=skill_def.name,
+                        technology=skill_def.category,
+                        version="1.0.0",
+                        status=SkillStatus.DRAFT,
+                        source=SkillSource.RESEARCH_AGENT,
+                        skill_md=(
+                            f"# {skill_def.name}\n\n"
+                            f"{skill_def.description}\n\n"
+                            f"{skill_def.content}"
+                        ),
+                        source_repos=skill_def.source_repos,
+                        source_urls=skill_def.source_urls,
+                        tenant_id=tenant_id,
+                        metrics=SkillMetrics(
+                            skill_id=skill_id,
+                            confidence_score=skill_def.confidence,
+                        ),
+                    )
+
+                    # Salva come DRAFT
+                    await self._skill_repo.save(skill)
+
+                    # Avvia board review in background
+                    if self._board_reviewer:
+                        asyncio.create_task(
+                            self._board_reviewer.submit_for_review(skill)
+                        )
+
                     saved += 1
+                else:
+                    # Fallback: salva nella KB generica
+                    if self._kb and hasattr(self._kb, "add_skill"):
+                        await self._kb.add_skill({
+                            "name": skill_def.name,
+                            "description": skill_def.description,
+                            "category": skill_def.category,
+                            "tags": skill_def.tags,
+                            "content": skill_def.content,
+                            "confidence": skill_def.confidence,
+                        })
+                        saved += 1
+                    elif self._kb and hasattr(self._kb, "add"):
+                        await self._kb.add(
+                            f"skill:{skill_def.name}",
+                            skill_def.content,
+                            metadata={
+                                "name": skill_def.name,
+                                "category": skill_def.category,
+                                "tags": ",".join(skill_def.tags),
+                            },
+                        )
+                        saved += 1
+
             except Exception as e:
-                self._logger.warning(f"Failed to save skill {skill.name}: {e}")
+                self._logger.warning(f"Failed to save skill {skill_def.name}: {e}")
 
         return saved
 
