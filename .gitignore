@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Data & Runtime
+data/
+*.db
+*.sqlite3
+
+# License cache (grace period)
+data/.license_cache.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+docker/qdrant/storage/
+
+# Skills (user-generated)
+skills/
+
+# Logs
+*.log

@@ -1,0 +1,72 @@
+/* Neural Hub TUI Theme */
+
+Screen {
+    background: $background;
+}
+
+Header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+Footer {
+    background: $surface;
+}
+
+.panel-title {
+    text-style: bold;
+    color: $accent;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+.status-running {
+    color: $success;
+}
+
+.status-pending {
+    color: $warning;
+}
+
+.status-failed {
+    color: $error;
+}
+
+.status-completed {
+    color: $success;
+    text-style: dim;
+}
+
+.confidence-high {
+    color: $success;
+}
+
+.confidence-medium {
+    color: $warning;
+}
+
+.confidence-low {
+    color: $error;
+}
+
+DataTable {
+    height: 1fr;
+}
+
+RichLog {
+    height: 1fr;
+    border: solid $primary;
+}
+
+Tree {
+    height: 1fr;
+}
+
+Input {
+    margin: 0 1;
+}
+
+Button {
+    margin: 0 1;
+}

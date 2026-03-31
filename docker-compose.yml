@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "${NOXEN_QDRANT_PORT:-6333}:6333"
+      - "${NOXEN_QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  noxen:
+    build: .
+    ports:
+      - "${NOXEN_PORT:-8400}:8400"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    environment:
+      - NOXEN_QDRANT_URL=http://qdrant:6333
+      - NOXEN_QDRANT_API_KEY=${NOXEN_QDRANT_API_KEY:-}
+      - NOXEN_OLLAMA_BASE_URL=${NOXEN_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - NOXEN_DEFAULT_MODEL=${NOXEN_DEFAULT_MODEL:-llama3:8b}
+      - NOXEN_EMBEDDING_MODEL=${NOXEN_EMBEDDING_MODEL:-nomic-embed-text}
+      - NOXEN_GEMINI_API_KEY=${NOXEN_GEMINI_API_KEY:-}
+      - NOXEN_CLAUDE_API_KEY=${NOXEN_CLAUDE_API_KEY:-}
+      - NOXEN_OPENAI_API_KEY=${NOXEN_OPENAI_API_KEY:-}
+      - NOXEN_GROK_API_KEY=${NOXEN_GROK_API_KEY:-}
+      - NOXEN_MERCURY_API_KEY=${NOXEN_MERCURY_API_KEY:-}
+      - NOXEN_QWEN_API_KEY=${NOXEN_QWEN_API_KEY:-}
+      - NOXEN_LLM_MODE=${NOXEN_LLM_MODE:-single}
+      - NOXEN_ACTIVE_PROVIDER=${NOXEN_ACTIVE_PROVIDER:-ollama}
+      - NOXEN_BOARD_CHAIRMAN=${NOXEN_BOARD_CHAIRMAN:-gemini}
+      - NOXEN_GITHUB_TOKEN=${NOXEN_GITHUB_TOKEN:-}
+      - NOXEN_EXA_API_KEY=${NOXEN_EXA_API_KEY:-}
+      - NOXEN_FIRECRAWL_API_KEY=${NOXEN_FIRECRAWL_API_KEY:-}
+      - NOXEN_TELEGRAM_BOT_TOKEN=${NOXEN_TELEGRAM_BOT_TOKEN:-}
+      - NOXEN_TELEGRAM_CHAT_ID=${NOXEN_TELEGRAM_CHAT_ID:-}
+      - NOXEN_SLACK_BOT_TOKEN=${NOXEN_SLACK_BOT_TOKEN:-}
+      - NOXEN_SLACK_CHANNEL_ID=${NOXEN_SLACK_CHANNEL_ID:-}
+      - NOXEN_MULTITENANT_ENABLED=${NOXEN_MULTITENANT_ENABLED:-false}
+      - NOXEN_ADMIN_API_KEY=${NOXEN_ADMIN_API_KEY:-}
+      - NOXEN_HOST=0.0.0.0
+      - NOXEN_PORT=8400
+      - NOXEN_DEBUG=${NOXEN_DEBUG:-false}
+    volumes:
+      - noxen_data:/app/data
+      - ${NOXEN_SKILLS_DIR:-./skills}:/app/skills
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
+  noxen_data:

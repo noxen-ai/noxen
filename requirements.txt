@@ -1,0 +1,66 @@
+# Neural Hub - AI Orchestrator
+# Core Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Templating & Web UI
+jinja2==3.1.5
+python-multipart==0.0.20
+
+# Vector Database (Qdrant — replaces ChromaDB in v0.3.0)
+qdrant-client>=1.12.0
+
+# Async & Background Tasks
+aiofiles==24.1.0
+
+# Execution Engine (Goal Graph DAG)
+networkx>=3.0
+
+# Notification Engine (Phase 5 — multi-channel notifications)
+python-telegram-bot>=21.0
+slack-sdk>=3.30
+aiosmtplib>=3.0
+
+# Code Parsing & Indexing (tree-sitter AST)
+tree-sitter>=0.25.0
+tree-sitter-python>=0.25.0
+tree-sitter-javascript>=0.25.0
+tree-sitter-typescript>=0.23.0
+tree-sitter-java>=0.23.0
+tree-sitter-go>=0.25.0
+gitignore-parser==0.1.11
+chardet==5.2.0
+
+# Research Agent — GitHub, Web, Repo Analysis
+PyGithub>=2.0
+gql>=3.5
+aiohttp>=3.9
+gitpython>=3.1
+firecrawl-py>=1.0
+exa-py>=1.0
+
+# Database (read-only analysis)
+aiomysql==0.2.0
+
+# HTTP & Resilience
+httpx==0.28.1
+tenacity>=9.0.0
+
+# Embedding (local, no GPU required)
+fastembed>=0.4.0
+
+# Structured Logging
+structlog>=24.0.0
+
+# TUI (Phase 7 — Terminal User Interface)
+textual>=0.90
+
+# Utilities
+rich==13.9.4
+pyyaml==6.0.2
+
+# Testing
+pytest>=9.0.0
+pytest-asyncio>=1.0.0

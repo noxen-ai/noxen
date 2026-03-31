@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Noxen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen" x-data="noxenApp()" x-init="init()">
+
+  <!-- ── Offline Banner ─────────────────────────────── -->
+  <div x-show="serverStatus === 'offline'" x-transition class="fixed top-0 left-0 right-0 z-50 bg-red-900 border-b border-red-700 px-4 py-3 text-center">
+    <span class="text-red-200 text-sm font-medium">&#9888; Noxen server not reachable — check internet connection and server status</span>
+    <button @click="loadStatus()" class="ml-4 text-xs px-2 py-1 rounded bg-red-800 hover:bg-red-700 text-red-200 transition">Retry</button>
+  </div>
+
+  <!-- ── Header ──────────────────────────────────────── -->
+  <header class="border-b border-gray-800 px-4 py-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">N</div>
+        <h1 class="text-lg font-semibold text-white">Noxen</h1>
+        <span class="text-[10px] bg-indigo-600/20 text-indigo-400 px-2 py-0.5 rounded-full" x-text="version"></span>
+        <span x-show="licenseInfo" class="text-xs px-2 py-0.5 rounded" :class="licenseInfo?.days_remaining !== null && licenseInfo?.days_remaining <= 30 ? 'bg-yellow-900 text-yellow-300' : 'bg-gray-800 text-gray-400'" x-text="licenseInfo ? (licenseInfo.plan_display || licenseInfo.plan_name) + ' · ' + (licenseInfo.days_remaining !== null ? licenseInfo.days_remaining + 'gg' : '\u221e') : ''"></span>
+      </div>
+      <div class="flex items-center gap-5 text-xs text-gray-400">
+        <span class="flex items-center gap-1.5">
+          <span :class="statusDotClass"></span>
+          <span x-text="statusLabel"></span>
+        </span>
+        <span x-show="activeProvider" class="flex items-center gap-1">
+          <span class="text-gray-600">LLM:</span>
+          <span class="text-indigo-400" x-text="activeProvider"></span>
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="text-gray-600">Tenant:</span>
+          <span x-text="tenantName"></span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Layout: Sidebar + Main ──────────────────────── -->
+  <div class="flex" style="height: calc(100vh - 53px);">
+
+    <!-- Sidebar -->
+    <nav class="w-48 border-r border-gray-800 py-3 flex-shrink-0 overflow-y-auto">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button
+          @click="setTab(tab.id)"
+          :class="activeTab === tab.id ? 'sidebar-item active' : 'sidebar-item'"
+          class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-400 hover:text-white"
+        >
+          <span class="w-5 text-center opacity-60" x-html="tab.icon"></span>
+          <span x-text="tab.label"></span>
+        </button>
+      </template>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6">
+
+      <!-- ── TAB: Overview ─────────────────────────── -->
+      <div x-show="activeTab === 'overview'" x-data="overviewComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">System Overview</h2>
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4 glow">
+            <div class="text-xs text-gray-500 mb-1">Server</div>
+            <div class="text-lg font-bold" :class="$root.serverStatus === 'online' ? 'text-green-400' : 'text-red-400'" x-text="$root.statusLabel"></div>
+            <p class="text-xs text-gray-500 mt-1" x-show="$root.serverStatus === 'online'">Internet connection active</p>
+            <p class="text-xs text-red-400 mt-1" x-show="$root.serverStatus === 'offline'">No internet — LLM providers unavailable</p>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">LLM Provider</div>
+            <div class="text-lg font-bold text-indigo-400" x-text="$root.activeProvider || '-'"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Skills (Approved)</div>
+            <div class="text-lg font-bold text-white" x-text="skillStats?.stats?.total || 0"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Qdrant</div>
+            <div class="text-lg font-bold" :class="qdrantStats?.healthy ? 'text-green-400' : 'text-gray-600'" x-text="qdrantStats?.healthy ? 'OK' : '-'"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Engine</div>
+            <div class="text-lg font-bold text-white" x-text="engineStatus?.running ? 'Running' : 'Idle'"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div class="text-xs text-gray-500 mb-1">Tenant</div>
+            <div class="text-lg font-bold text-white" x-text="$root.tenantName"></div>
+          </div>
+        </div>
+
+        <!-- Qdrant Collections -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4 mb-6" x-show="qdrantStats?.collections">
+          <h3 class="text-sm font-medium text-gray-400 mb-3">Qdrant Collections</h3>
+          <div class="grid grid-cols-3 md:grid-cols-7 gap-2">
+            <template x-for="(count, name) in (qdrantStats?.collections || {})" :key="name">
+              <div class="bg-gray-950 rounded-lg p-3 text-center">
+                <div class="text-xs text-gray-500" x-text="name"></div>
+                <div class="text-lg font-bold text-white" x-text="count"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-medium text-gray-400">Recent Events</h3>
+            <button @click="loadRecentEvents()" class="text-xs text-indigo-400 hover:text-indigo-300">Refresh</button>
+          </div>
+          <div class="space-y-1 max-h-64 overflow-y-auto">
+            <template x-for="event in recentEvents" :key="event.id || event.timestamp">
+              <div class="flex items-center gap-3 py-1.5 text-xs border-b border-gray-800/50">
+                <span class="text-gray-600 w-16 flex-shrink-0" x-text="formatTime(event.timestamp)"></span>
+                <span :class="eventColor(event.source || event.type)" x-text="event.type || event.event_type"></span>
+                <span class="text-gray-400 truncate" x-text="event.data?.message || event.summary || ''"></span>
+              </div>
+            </template>
+            <div x-show="recentEvents.length === 0" class="text-xs text-gray-600 py-4 text-center">No events yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Chat ─────────────────────────────── -->
+      <div x-show="activeTab === 'chat'" x-data="chatComponent()" x-init="init()">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-white">Chat</h2>
+          <div class="flex items-center gap-3 text-xs text-gray-500">
+            <span x-text="statusText"></span>
+            <span x-text="kbInfo"></span>
+            <span x-text="llmInfo"></span>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div id="chat-messages-container" class="bg-gray-950 border border-gray-800 rounded-xl p-4 mb-3 overflow-y-auto" style="height: calc(100vh - 240px);">
+          <template x-for="(msg, i) in messages" :key="i">
+            <div :class="msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-ai'" class="rounded-lg p-3 text-sm whitespace-pre-wrap mb-2">
+              <span x-html="msg.content"></span>
+              <span x-show="msg.streaming" class="typing-cursor"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Input -->
+        <div class="flex gap-2">
+          <input x-model="input" @keydown.enter.prevent="sendMessage()" type="text"
+                 placeholder="Ask anything..."
+                 class="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+          <button @click="sendMessage()" :disabled="streaming"
+                  class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-3 rounded-lg text-sm font-medium">
+            Send
+          </button>
+          <button @click="clearChat()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 px-4 py-3 rounded-lg text-sm">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <!-- ── TAB: Research ─────────────────────────── -->
+      <div x-show="activeTab === 'research'" x-data="researchComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Research Agent</h2>
+
+        <!-- Trigger Form -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6">
+          <h3 class="text-sm font-medium text-white mb-3">Trigger Research</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <input x-model="query" type="text" placeholder="Query (e.g. 'FastAPI authentication')"
+                   class="md:col-span-2 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+            <button @click="triggerResearch()" :disabled="triggering || !query"
+                    class="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium">
+              <span x-show="!triggering">Launch Research</span>
+              <span x-show="triggering">Researching...</span>
+            </button>
+          </div>
+          <input x-model="context" type="text" placeholder="Context (optional)"
+                 class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Status -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Agent Status</h3>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between"><span class="text-gray-500">Configured</span><span :class="status?.configured ? 'text-green-400' : 'text-red-400'" x-text="status?.configured ? 'Yes' : 'No'"></span></div>
+              <template x-for="(val, key) in (status?.components || {})" :key="key">
+                <div class="flex justify-between"><span class="text-gray-500" x-text="key"></span><span :class="val ? 'text-green-400' : 'text-gray-600'" x-text="val ? 'Ready' : 'N/A'"></span></div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Pending Skills -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Pending Review (<span x-text="pendingSkills.length"></span>)</h3>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <template x-for="skill in pendingSkills" :key="skill.id">
+                <div class="flex items-center justify-between bg-gray-950 rounded-lg p-2 text-xs">
+                  <span class="text-white" x-text="skill.name"></span>
+                  <span class="text-gray-500" x-text="skill.technology"></span>
+                </div>
+              </template>
+              <div x-show="pendingSkills.length === 0" class="text-xs text-gray-600 text-center py-3">No pending skills</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Research Log -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4 mt-6" x-show="researchLog.length > 0">
+          <h3 class="text-sm font-medium text-gray-400 mb-3">Research Log</h3>
+          <div class="space-y-1 max-h-48 overflow-y-auto font-mono">
+            <template x-for="(entry, i) in researchLog" :key="i">
+              <div class="text-xs flex gap-2">
+                <span class="text-gray-600" x-text="entry.time"></span>
+                <span :class="logColor(entry.type)" x-text="entry.message"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Skills ───────────────────────────── -->
+      <div x-show="activeTab === 'skills'" x-data="skillsComponent()" x-init="init()">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="text-xl font-semibold text-white">Skill Pool</h2>
+          <div class="flex items-center gap-3">
+            <input x-model="searchQuery" type="text" placeholder="Search skills..."
+                   class="text-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 w-48">
+            <select x-model="filter" @change="loadSkills()"
+                    class="text-xs bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-white">
+              <option value="approved">Approved</option>
+              <option value="draft">Draft</option>
+              <option value="board_review">In Review</option>
+              <option value="rejected">Rejected</option>
+              <option value="deprecated">Deprecated</option>
+            </select>
+            <button @click="loadSkills()" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded-lg">Refresh</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6" x-show="stats?.stats">
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-center">
+            <div class="text-xs text-gray-500">Total</div>
+            <div class="text-xl font-bold text-white" x-text="stats?.stats?.total || 0"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-center">
+            <div class="text-xs text-gray-500">Avg Confidence</div>
+            <div class="text-xl font-bold" :class="confidenceColor(stats?.stats?.avg_confidence || 0)" x-text="((stats?.stats?.avg_confidence || 0) * 100).toFixed(0) + '%'"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-center">
+            <div class="text-xs text-gray-500">Technologies</div>
+            <div class="text-xl font-bold text-white" x-text="Object.keys(stats?.stats?.technologies || {}).length"></div>
+          </div>
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-3 text-center">
+            <div class="text-xs text-gray-500">Showing</div>
+            <div class="text-xl font-bold text-white" x-text="filteredSkills.length"></div>
+          </div>
+        </div>
+
+        <!-- Skill Table -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-800 text-xs text-gray-500">
+                <th class="text-left px-4 py-3">Name</th>
+                <th class="text-left px-4 py-3">Technology</th>
+                <th class="text-left px-4 py-3">Version</th>
+                <th class="text-left px-4 py-3">Confidence</th>
+                <th class="text-left px-4 py-3">Uses</th>
+                <th class="text-left px-4 py-3">Status</th>
+                <th class="text-left px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="skill in filteredSkills" :key="skill.id">
+                <tr class="border-b border-gray-800/50 hover:bg-gray-900/30">
+                  <td class="px-4 py-3 text-white font-medium" x-text="skill.name"></td>
+                  <td class="px-4 py-3 text-gray-400" x-text="skill.technology"></td>
+                  <td class="px-4 py-3 text-gray-500" x-text="skill.version"></td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                      <div class="confidence-bar w-16">
+                        <div class="confidence-fill" :class="confidenceBar(skill.confidence_score).color" :style="'width:' + confidenceBar(skill.confidence_score).pct + '%'"></div>
+                      </div>
+                      <span :class="confidenceColor(skill.confidence_score)" class="text-xs" x-text="(skill.confidence_score * 100).toFixed(0) + '%'"></span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-gray-500" x-text="skill.total_uses || 0"></td>
+                  <td class="px-4 py-3"><span class="badge" :class="statusBadge(skill.status)" x-text="skill.status"></span></td>
+                  <td class="px-4 py-3">
+                    <div class="flex gap-1">
+                      <button x-show="skill.status === 'board_review' || skill.status === 'draft'" @click="approveSkill(skill.id)" class="text-[10px] bg-green-900/50 text-green-400 px-2 py-1 rounded hover:bg-green-900">Approve</button>
+                      <button x-show="skill.status === 'board_review' || skill.status === 'draft'" @click="rejectSkill(skill.id)" class="text-[10px] bg-red-900/50 text-red-400 px-2 py-1 rounded hover:bg-red-900">Reject</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div x-show="filteredSkills.length === 0 && !loading" class="text-center py-8 text-gray-600 text-sm">No skills found</div>
+          <div x-show="loading" class="text-center py-8 text-gray-500 text-sm animate-pulse">Loading...</div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Board ────────────────────────────── -->
+      <div x-show="activeTab === 'board'" x-data="boardComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Board Deliberations</h2>
+
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-medium text-gray-400">Recent Decisions</h3>
+            <button @click="loadDecisions()" class="text-xs text-indigo-400 hover:text-indigo-300">Refresh</button>
+          </div>
+          <div class="space-y-2 max-h-96 overflow-y-auto">
+            <template x-for="(d, i) in decisions" :key="i">
+              <div class="flex items-center gap-3 bg-gray-950 rounded-lg p-3 text-xs">
+                <span class="text-gray-600 w-16 flex-shrink-0" x-text="formatTime(d.timestamp)"></span>
+                <span class="badge" :class="decisionBadge(d.data?.decision || d.type)" x-text="d.data?.decision || d.type"></span>
+                <span class="text-white" x-text="d.data?.skill_name || d.summary || ''"></span>
+                <span class="text-gray-500 ml-auto" x-text="d.source || ''"></span>
+              </div>
+            </template>
+            <div x-show="decisions.length === 0" class="text-center py-8 text-gray-600 text-sm">No board decisions yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Execution ────────────────────────── -->
+      <div x-show="activeTab === 'execution'" x-data="executionComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Execution Engine</h2>
+
+        <!-- Start Form -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6">
+          <h3 class="text-sm font-medium text-white mb-3">Launch Session</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input x-model="projectPath" type="text" placeholder="Project path (e.g. /Users/luigi/my-project)"
+                   class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+            <input x-model="projectName" type="text" placeholder="Project name"
+                   class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+            <div class="flex gap-2">
+              <button @click="startEngine()" :disabled="starting || !projectPath"
+                      class="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium">
+                <span x-show="!starting">Start Engine</span>
+                <span x-show="starting">Starting...</span>
+              </button>
+              <button @click="stopEngine()" x-show="sessionStatus?.running"
+                      class="bg-red-600/80 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-lg">Stop</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Approval Banner -->
+        <div x-show="approvalPending" class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 mb-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-medium text-yellow-300">Plan Awaiting Approval</h3>
+              <p class="text-xs text-yellow-400/70 mt-1">Review the generated plan before execution proceeds.</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="approveAll()" class="bg-green-600 hover:bg-green-700 text-white text-xs px-4 py-2 rounded-lg font-medium">Approve</button>
+              <button @click="rejectPlan()" class="bg-red-600/80 hover:bg-red-600 text-white text-xs px-4 py-2 rounded-lg">Reject</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Goals -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Goals</h3>
+            <div class="space-y-2 max-h-80 overflow-y-auto">
+              <template x-for="(goal, i) in goals" :key="i">
+                <div class="flex items-center gap-2 text-xs bg-gray-950 rounded-lg p-2">
+                  <span :class="goalStatusColor(goal.status)" x-text="goalStatusIcon(goal.status)"></span>
+                  <span class="text-white" x-text="goal.title || goal.description || 'Goal ' + (i+1)"></span>
+                </div>
+              </template>
+              <div x-show="goals.length === 0" class="text-xs text-gray-600 text-center py-4">No goals yet</div>
+            </div>
+          </div>
+
+          <!-- SSE Log -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Execution Log</h3>
+            <div class="space-y-1 max-h-80 overflow-y-auto font-mono">
+              <template x-for="(entry, i) in sseLog" :key="i">
+                <div class="log-line flex gap-2">
+                  <span class="text-gray-600" x-text="entry.time"></span>
+                  <span :class="{'text-green-400': entry.type==='success', 'text-red-400': entry.type==='error', 'text-yellow-400': entry.type==='warning', 'text-gray-400': entry.type==='info'}" x-text="entry.message"></span>
+                </div>
+              </template>
+              <div x-show="sseLog.length === 0" class="text-xs text-gray-600 text-center py-4">Engine idle</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Notifications ────────────────────── -->
+      <div x-show="activeTab === 'notifications'" x-data="notificationsComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Notifications</h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Channels -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Channels</h3>
+            <div class="space-y-2">
+              <template x-for="ch in channels" :key="ch.name">
+                <div class="flex items-center justify-between bg-gray-950 rounded-lg p-3">
+                  <div class="flex items-center gap-2">
+                    <span x-text="channelIcon(ch.name)"></span>
+                    <span class="text-sm text-white" x-text="ch.name"></span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs" :class="ch.configured ? 'text-green-400' : 'text-gray-600'" x-text="ch.configured ? 'Active' : 'Not configured'"></span>
+                    <button @click="testChannel(ch.name)" :disabled="testingChannel === ch.name" x-show="ch.configured"
+                            class="text-[10px] bg-indigo-600/30 text-indigo-400 px-2 py-1 rounded hover:bg-indigo-600/50">
+                      <span x-show="testingChannel !== ch.name">Test</span>
+                      <span x-show="testingChannel === ch.name">Sending...</span>
+                    </button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="channels.length === 0" class="text-xs text-gray-600 text-center py-4">No channels configured</div>
+            </div>
+          </div>
+
+          <!-- Pending Approvals -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <h3 class="text-sm font-medium text-gray-400 mb-3">Pending Approvals (<span x-text="pendingApprovals.length"></span>)</h3>
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+              <template x-for="a in pendingApprovals" :key="a.approval_id">
+                <div class="bg-gray-950 rounded-lg p-3">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs text-white" x-text="a.project_name || a.approval_id"></span>
+                    <span class="text-[10px] text-gray-500" x-text="a.created_at"></span>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="approveRequest(a.approval_id)" class="text-[10px] bg-green-900/50 text-green-400 px-2 py-1 rounded hover:bg-green-900">Approve</button>
+                    <button @click="rejectRequest(a.approval_id)" class="text-[10px] bg-red-900/50 text-red-400 px-2 py-1 rounded hover:bg-red-900">Reject</button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="pendingApprovals.length === 0" class="text-xs text-gray-600 text-center py-4">No pending approvals</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Settings ─────────────────────────── -->
+      <div x-show="activeTab === 'settings'" x-data="settingsComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Settings</h2>
+
+        <!-- LLM Mode -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6">
+          <h3 class="text-sm font-medium text-white mb-3">LLM Mode</h3>
+          <div class="flex gap-4 text-sm">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" value="single" x-model="settings.llm.mode" @change="saveSettings({llm_mode: 'single'})" class="accent-indigo-600">
+              <span class="text-white">Single Provider</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" value="board" x-model="settings.llm.mode" @change="saveSettings({llm_mode: 'board'})" class="accent-indigo-600">
+              <span class="text-white">Board (CDA)</span>
+              <span class="text-xs text-gray-500">All providers in parallel</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Provider Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <template x-for="(cfg, name) in (settings?.llm?.providers || {})" :key="name">
+            <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-white font-medium capitalize" x-text="name"></h4>
+                <span class="badge" :class="cfg.configured ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-gray-500'" x-text="testResults[name] || (cfg.configured ? 'Configured' : 'Not set')"></span>
+              </div>
+              <div class="space-y-2">
+                <input x-show="name !== 'ollama'" type="password" placeholder="API Key"
+                       :value="cfg.has_key ? '********' : ''"
+                       @change="saveProvider(name, $event.target.value, '')"
+                       class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+                <div class="flex items-center gap-2">
+                  <input type="text" :placeholder="'Model'" :value="cfg.model || ''"
+                         class="flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white text-xs" disabled>
+                  <button @click="testProvider(name)" class="text-xs bg-gray-800 hover:bg-gray-700 text-white px-3 py-1.5 rounded">Test</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- MySQL -->
+        <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5">
+          <h3 class="text-sm font-medium text-white mb-3">MySQL (Read-Only)</h3>
+          <p class="text-xs text-gray-500 mb-3">Configure connection to analyze your database schema.</p>
+          <div class="grid grid-cols-5 gap-3">
+            <input type="text" placeholder="Host" :value="settings?.mysql?.host || 'localhost'"
+                   class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+            <input type="text" placeholder="Port" :value="settings?.mysql?.port || 3306"
+                   class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+            <input type="text" placeholder="User" :value="settings?.mysql?.user || ''"
+                   class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+            <input type="password" placeholder="Password"
+                   class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+            <input type="text" placeholder="Database" :value="settings?.mysql?.database || ''"
+                   class="bg-gray-950 border border-gray-700 rounded px-3 py-1.5 text-sm text-white">
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB: Admin ────────────────────────────── -->
+      <div x-show="activeTab === 'admin'" x-data="adminComponent()" x-init="init()">
+        <h2 class="text-xl font-semibold text-white mb-5">Tenant Administration</h2>
+
+        <div x-show="!isAdmin" class="bg-gray-900/50 border border-gray-800 rounded-xl p-8 text-center">
+          <p class="text-gray-500">Admin access required. Use an admin API key to access this section.</p>
+        </div>
+
+        <div x-show="isAdmin">
+          <!-- Create Tenant -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mb-6">
+            <h3 class="text-sm font-medium text-white mb-3">Create Tenant</h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input x-model="newTenant.name" type="text" placeholder="Name"
+                     class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+              <input x-model="newTenant.slug" type="text" placeholder="slug (lowercase, hyphens)"
+                     class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+              <select x-model="newTenant.plan" class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
+                <option value="free">Free</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+              <button @click="createTenant()" :disabled="!newTenant.name || !newTenant.slug"
+                      class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium">Create</button>
+            </div>
+          </div>
+
+          <!-- Generated Key Banner -->
+          <div x-show="generatedKey" class="bg-green-900/30 border border-green-700/50 rounded-xl p-4 mb-6">
+            <p class="text-xs text-green-400 mb-1 font-medium">API Key Generated (save it now — shown once!):</p>
+            <code class="text-sm text-green-300 font-mono" x-text="generatedKey"></code>
+          </div>
+
+          <!-- Tenant Table -->
+          <div class="bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-800 text-xs text-gray-500">
+                  <th class="text-left px-4 py-3">Name</th>
+                  <th class="text-left px-4 py-3">Slug</th>
+                  <th class="text-left px-4 py-3">Plan</th>
+                  <th class="text-left px-4 py-3">Status</th>
+                  <th class="text-left px-4 py-3">Sessions</th>
+                  <th class="text-left px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="t in tenants" :key="t.id">
+                  <tr class="border-b border-gray-800/50 hover:bg-gray-900/30">
+                    <td class="px-4 py-3 text-white" x-text="t.name"></td>
+                    <td class="px-4 py-3 text-gray-400 font-mono text-xs" x-text="t.slug"></td>
+                    <td class="px-4 py-3"><span class="badge" :class="planBadge(t.plan)" x-text="t.plan"></span></td>
+                    <td class="px-4 py-3"><span class="badge" :class="statusBadge(t.status)" x-text="t.status"></span></td>
+                    <td class="px-4 py-3 text-gray-500" x-text="t.sessions_this_month || 0"></td>
+                    <td class="px-4 py-3">
+                      <div class="flex gap-1">
+                        <button @click="selectedTenant = t" class="text-[10px] bg-indigo-900/50 text-indigo-400 px-2 py-1 rounded hover:bg-indigo-900">Keys</button>
+                        <button x-show="t.id !== 'default'" @click="deleteTenant(t.id)" class="text-[10px] bg-red-900/50 text-red-400 px-2 py-1 rounded hover:bg-red-900">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- API Key creation panel -->
+          <div x-show="selectedTenant" class="bg-gray-900/50 border border-gray-800 rounded-xl p-5 mt-6">
+            <h3 class="text-sm font-medium text-white mb-3">API Keys for: <span class="text-indigo-400" x-text="selectedTenant?.name"></span></h3>
+            <div class="flex gap-3">
+              <input x-model="newApiKeyName" type="text" placeholder="Key name (e.g. prod-key)"
+                     class="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500">
+              <button @click="createApiKey(selectedTenant?.id)" :disabled="!newApiKeyName"
+                      class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg font-medium">Generate Key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ── Toast Notifications ───────────────────────── -->
+  <div class="fixed top-4 right-4 z-50 space-y-2">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div :class="toastColor(toast.type)" class="toast-enter border rounded-lg px-4 py-3 text-sm shadow-lg max-w-sm">
+        <span x-text="toast.message"></span>
+      </div>
+    </template>
+  </div>
+
+  <!-- ── Scripts ───────────────────────────────────── -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/sse.js"></script>
+  <script src="/static/js/components/overview.js"></script>
+  <script src="/static/js/components/chat.js"></script>
+  <script src="/static/js/components/research.js"></script>
+  <script src="/static/js/components/skills.js"></script>
+  <script src="/static/js/components/board.js"></script>
+  <script src="/static/js/components/execution.js"></script>
+  <script src="/static/js/components/notifications.js"></script>
+  <script src="/static/js/components/settings.js"></script>
+  <script src="/static/js/components/admin.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

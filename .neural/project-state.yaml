@@ -1,0 +1,13 @@
+current_cycle: 12
+current_phase: done
+goals_done: 10
+goals_skipped: 0
+goals_total: 10
+health_score_current: 0
+health_score_initial: 0
+is_running: false
+project_name: Neural-Hub
+project_path: /Users/luigi/Neural-Hub
+started_at: '2026-03-29T01:56:29.362468'
+stop_requested: false
+total_cycles: 12
