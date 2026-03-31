@@ -179,65 +179,59 @@ class LicenseError(Exception):
 class NoxenPlan:
     """Commercial plan definition."""
     name: str
-    projects_total: int          # -1 = unlimited
-    duration_days: int           # -1 = unlimited
+    display_name: str
+    projects_limit: int           # -1 = illimitato
+    llm_providers_limit: int      # max provider configurabili
     board_enabled: bool
-    research_sessions_total: int  # -1 = unlimited
+    board_providers_limit: int    # max provider nel board
+    research_sessions_month: int  # -1 = illimitato
+    execution_hours_day: float    # -1 = illimitato
     custom_skills: bool
+    remote_sandbox: bool          # True = Docker remoto
     all_notifications: bool
-    price_eur: float
+    duration_days: int            # 365 per entrambi
+    price_eur: float              # 0 = gratuito
+
+    # Backward-compat aliases
+    @property
+    def projects_total(self) -> int:
+        return self.projects_limit
+
+    @property
+    def research_sessions_total(self) -> int:
+        return self.research_sessions_month
 
 
 NOXEN_PLANS: dict[str, NoxenPlan] = {
-    "trial": NoxenPlan(
-        name="trial",
-        projects_total=1,
-        duration_days=30,
+    "developer": NoxenPlan(
+        name="developer",
+        display_name="Developer",
+        projects_limit=1,
+        llm_providers_limit=2,
         board_enabled=False,
-        research_sessions_total=3,
+        board_providers_limit=1,
+        research_sessions_month=50,
+        execution_hours_day=3.0,
         custom_skills=False,
+        remote_sandbox=False,
         all_notifications=False,
-        price_eur=0.0,
-    ),
-    "starter": NoxenPlan(
-        name="starter",
-        projects_total=1,
         duration_days=365,
-        board_enabled=True,
-        research_sessions_total=-1,
-        custom_skills=False,
-        all_notifications=True,
-        price_eur=299.0,
+        price_eur=0.0,
     ),
     "team": NoxenPlan(
         name="team",
-        projects_total=5,
-        duration_days=365,
+        display_name="Team",
+        projects_limit=-1,
+        llm_providers_limit=-1,
         board_enabled=True,
-        research_sessions_total=-1,
+        board_providers_limit=-1,
+        research_sessions_month=-1,
+        execution_hours_day=-1,
         custom_skills=True,
+        remote_sandbox=True,
         all_notifications=True,
+        duration_days=365,
         price_eur=899.0,
-    ),
-    "scale": NoxenPlan(
-        name="scale",
-        projects_total=15,
-        duration_days=365,
-        board_enabled=True,
-        research_sessions_total=-1,
-        custom_skills=True,
-        all_notifications=True,
-        price_eur=1999.0,
-    ),
-    "enterprise": NoxenPlan(
-        name="enterprise",
-        projects_total=-1,
-        duration_days=-1,
-        board_enabled=True,
-        research_sessions_total=-1,
-        custom_skills=True,
-        all_notifications=True,
-        price_eur=0.0,
     ),
 }
 
@@ -298,26 +292,68 @@ class TenantLicense:
     def can_use_board(self) -> tuple[bool, str]:
         if not self.plan.board_enabled:
             return False, (
-                f"Il piano {self.plan_name} non include Board mode. "
-                "Upgrade su noxen.ai/upgrade"
+                "Il Board LLM non è disponibile "
+                "nel piano Developer. "
+                "Upgrade a Team: noxen.ai/upgrade"
             )
         return True, ""
 
     def can_use_research(self) -> tuple[bool, str]:
-        if self.research_sessions_total == -1:
+        limit = self.plan.research_sessions_month
+        if limit == -1:
             return True, ""
-        if self.research_sessions_used >= self.research_sessions_total:
+        if self.research_sessions_used >= limit:
             return False, (
-                f"Hai esaurito le {self.research_sessions_total} sessioni research. "
-                "Upgrade su noxen.ai/upgrade"
+                f"Hai esaurito le {limit} ricerche "
+                f"mensili del piano Developer. "
+                f"Upgrade a Team: noxen.ai/upgrade"
             )
         return True, ""
 
     def can_use_custom_skills(self) -> tuple[bool, str]:
         if not self.plan.custom_skills:
             return False, (
-                f"Il piano {self.plan_name} non include custom skills. "
-                "Upgrade su noxen.ai/upgrade"
+                "Le skill custom non sono disponibili "
+                "nel piano Developer. "
+                "Upgrade a Team: noxen.ai/upgrade"
+            )
+        return True, ""
+
+    def can_use_remote_sandbox(self) -> tuple[bool, str]:
+        if not self.plan.remote_sandbox:
+            return False, (
+                "Il sandbox remoto non è disponibile "
+                "nel piano Developer. "
+                "Il progetto verrà copiato localmente."
+            )
+        return True, ""
+
+    def can_configure_llm(
+        self, provider_count: int
+    ) -> tuple[bool, str]:
+        limit = self.plan.llm_providers_limit
+        if limit == -1:
+            return True, ""
+        if provider_count > limit:
+            return False, (
+                f"Il piano Developer supporta max "
+                f"{limit} provider LLM. "
+                f"Upgrade a Team: noxen.ai/upgrade"
+            )
+        return True, ""
+
+    def can_start_execution(
+        self, hours_used_today: float
+    ) -> tuple[bool, str]:
+        limit = self.plan.execution_hours_day
+        if limit == -1:
+            return True, ""
+        if hours_used_today >= limit:
+            return False, (
+                f"Hai esaurito le {limit} ore di "
+                f"esecuzione giornaliere del piano "
+                f"Developer. Riprova domani o "
+                f"upgrade a Team: noxen.ai/upgrade"
             )
         return True, ""
 
@@ -368,26 +404,26 @@ class TenantLicense:
     @classmethod
     def create_trial(cls, tenant_id: str) -> TenantLicense:
         from datetime import timedelta
-        plan = NOXEN_PLANS["trial"]
+        plan = NOXEN_PLANS["developer"]
         now = datetime.now()
         return cls(
             tenant_id=tenant_id,
-            plan_name="trial",
+            plan_name="developer",
             projects_total=plan.projects_total,
             research_sessions_total=plan.research_sessions_total,
             activated_at=now,
-            expires_at=now + timedelta(days=30),
+            expires_at=now + timedelta(days=plan.duration_days),
             created_at=now,
             updated_at=now,
         )
 
     @classmethod
     def create_onpremise(cls, tenant_id: str) -> TenantLicense:
-        plan = NOXEN_PLANS["enterprise"]
+        plan = NOXEN_PLANS["team"]
         now = datetime.now()
         return cls(
             tenant_id=tenant_id,
-            plan_name="enterprise",
+            plan_name="team",
             projects_total=plan.projects_total,
             research_sessions_total=plan.research_sessions_total,
             activated_at=now,

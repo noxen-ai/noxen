@@ -100,6 +100,36 @@ class TenantRepository:
                     FOREIGN KEY (tenant_id) REFERENCES tenants(id)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS execution_usage (
+                    id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    hours_used REAL DEFAULT 0.0,
+                    sessions_count INTEGER DEFAULT 0,
+                    UNIQUE(tenant_id, date)
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS users_auth (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT,
+                    google_id TEXT,
+                    name TEXT NOT NULL,
+                    user_type TEXT NOT NULL DEFAULT 'developer',
+                    company_name TEXT,
+                    country TEXT,
+                    website TEXT,
+                    tenant_id TEXT,
+                    api_key_hash TEXT,
+                    api_key_preview TEXT,
+                    created_at TEXT NOT NULL,
+                    last_login TEXT,
+                    onboarding_complete INTEGER DEFAULT 0,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+                )
+            """)
 
     def _get_conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
@@ -468,6 +498,214 @@ class TenantRepository:
 
         await self.set_license(new_license)
         return new_license
+
+    # ── Execution Time Tracking ──────────────────────────────────────
+
+    async def get_execution_hours_today(
+        self, tenant_id: str
+    ) -> float:
+        """Ore di esecuzione usate oggi."""
+        from datetime import date
+        today = date.today().isoformat()
+        conn = self._get_conn()
+        try:
+            row = conn.execute("""
+                SELECT hours_used FROM execution_usage
+                WHERE tenant_id=? AND date=?
+            """, (tenant_id, today)).fetchone()
+        finally:
+            conn.close()
+        return row["hours_used"] if row else 0.0
+
+    async def add_execution_time(
+        self,
+        tenant_id: str,
+        hours: float
+    ) -> None:
+        """Aggiunge ore di esecuzione per oggi."""
+        from datetime import date
+        today = date.today().isoformat()
+        conn = self._get_conn()
+        try:
+            conn.execute("""
+                INSERT INTO execution_usage
+                    (id, tenant_id, date, hours_used,
+                     sessions_count)
+                VALUES (?, ?, ?, ?, 1)
+                ON CONFLICT(tenant_id, date)
+                DO UPDATE SET
+                    hours_used = hours_used + ?,
+                    sessions_count = sessions_count + 1
+            """, (
+                secrets.token_urlsafe(8),
+                tenant_id, today, hours, hours
+            ))
+            conn.commit()
+        finally:
+            conn.close()
+
+    async def can_start_execution_today(
+        self, tenant_id: str
+    ) -> tuple[bool, str]:
+        """Verifica se il tenant può avviare una sessione oggi."""
+        license = await self.get_license(tenant_id)
+        if not license:
+            return True, ""  # on-premise permissivo
+
+        hours_today = await self.get_execution_hours_today(
+            tenant_id
+        )
+        return license.can_start_execution(hours_today)
+
+    # ── User Auth ────────────────────────────────────────────────────
+
+    async def create_user(
+        self,
+        email: str,
+        password: str = None,
+        google_id: str = None,
+        name: str = "",
+    ) -> dict:
+        """Create user + dedicated tenant + API key.
+
+        Returns: {user_id, tenant_id, api_key, email, name}
+        The api_key is plaintext only here — then hashed.
+        """
+        user_id = secrets.token_urlsafe(16)
+        tenant_id = "tenant_" + secrets.token_urlsafe(8)
+
+        # Hash password if provided
+        password_hash = None
+        if password:
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+        # Generate API key
+        api_key = "nh_" + secrets.token_urlsafe(32)
+        api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        api_key_preview = api_key[:12] + "..."
+
+        # Create tenant
+        tenant = Tenant(
+            id=tenant_id,
+            name=name or email.split("@")[0],
+            slug=tenant_id,
+            plan=TenantPlan.FREE,
+            status=TenantStatus.ACTIVE,
+            config=TenantConfig(),
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+        await self.create(tenant)
+
+        # Save user
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO users_auth
+                   (id, email, password_hash, google_id, name,
+                    user_type, tenant_id, api_key_hash,
+                    api_key_preview, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    user_id, email, password_hash, google_id,
+                    name, "developer", tenant_id,
+                    api_key_hash, api_key_preview,
+                    datetime.now().isoformat(),
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        return {
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "api_key": api_key,
+            "email": email,
+            "name": name,
+        }
+
+    async def authenticate_user(
+        self, email: str, password: str
+    ) -> Optional[dict]:
+        """Authenticate with email+password. Returns user dict or None."""
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM users_auth WHERE email=? AND password_hash=?",
+                (email, password_hash),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        return dict(row)
+
+    async def get_user_by_email(self, email: str) -> Optional[dict]:
+        """Get user by email."""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM users_auth WHERE email=?", (email,)
+            ).fetchone()
+        finally:
+            conn.close()
+        return dict(row) if row else None
+
+    async def get_user_by_id(self, user_id: str) -> Optional[dict]:
+        """Get user by ID."""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                "SELECT * FROM users_auth WHERE id=?", (user_id,)
+            ).fetchone()
+        finally:
+            conn.close()
+        return dict(row) if row else None
+
+    async def complete_onboarding(
+        self,
+        user_id: str,
+        user_type: str,
+        company_name: str,
+        country: str,
+        website: str = "",
+    ) -> None:
+        """Complete user onboarding profile."""
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """UPDATE users_auth
+                   SET user_type=?, company_name=?,
+                       country=?, website=?,
+                       onboarding_complete=1,
+                       last_login=?
+                   WHERE id=?""",
+                (
+                    user_type, company_name, country,
+                    website, datetime.now().isoformat(),
+                    user_id,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    async def get_user_api_key_info(self, tenant_id: str) -> Optional[dict]:
+        """Get user info by tenant_id (safe fields only)."""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                """SELECT id, email, name, user_type,
+                          company_name, country,
+                          api_key_preview, onboarding_complete
+                   FROM users_auth WHERE tenant_id=?""",
+                (tenant_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        return dict(row) if row else None
 
     # ── Helpers ───────────────────────────────────────────────────────
 

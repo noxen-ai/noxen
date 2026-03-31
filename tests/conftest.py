@@ -33,9 +33,10 @@ def make_default_tenant_ctx():
 
 def override_tenant_auth(app):
     """Override get_tenant_context dependency on a FastAPI app for testing."""
-    from core.tenants.auth import get_tenant_context
+    from core.tenants.auth import get_tenant_context, get_public_tenant_context
     ctx = make_default_tenant_ctx()
     app.dependency_overrides[get_tenant_context] = lambda: ctx
+    app.dependency_overrides[get_public_tenant_context] = lambda: ctx
     return app
 
 

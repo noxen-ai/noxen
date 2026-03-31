@@ -25,11 +25,11 @@ class TestCreateTrial:
         lic = TenantLicense.create_trial("t-001")
         assert lic.expires_at is not None
         delta = lic.expires_at - lic.activated_at
-        assert 29 <= delta.days <= 30
+        assert 364 <= delta.days <= 365
 
     def test_trial_plan_name(self):
         lic = TenantLicense.create_trial("t-001")
-        assert lic.plan_name == "trial"
+        assert lic.plan_name == "developer"
         assert lic.projects_total == 1
 
 
@@ -38,9 +38,9 @@ class TestCreateOnpremise:
         lic = TenantLicense.create_onpremise("default")
         assert lic.expires_at is None
 
-    def test_onpremise_enterprise_plan(self):
+    def test_onpremise_team_plan(self):
         lic = TenantLicense.create_onpremise("default")
-        assert lic.plan_name == "enterprise"
+        assert lic.plan_name == "team"
         assert lic.purchase_reference == "ON-PREMISE"
         assert lic.projects_total == -1
 
@@ -68,16 +68,16 @@ class TestCanActivateProject:
 
 
 class TestCanUseBoard:
-    def test_false_on_trial(self):
+    def test_false_on_developer(self):
         lic = TenantLicense.create_trial("t-001")
         can, reason = lic.can_use_board()
         assert can is False
         assert "Board" in reason
 
-    def test_true_on_starter(self):
-        plan = NOXEN_PLANS["starter"]
+    def test_true_on_team(self):
+        plan = NOXEN_PLANS["team"]
         lic = TenantLicense(
-            tenant_id="t-001", plan_name="starter",
+            tenant_id="t-001", plan_name="team",
             projects_total=plan.projects_total,
         )
         can, reason = lic.can_use_board()
@@ -90,7 +90,7 @@ class TestCanUseResearch:
         lic.research_sessions_used = lic.research_sessions_total
         can, reason = lic.can_use_research()
         assert can is False
-        assert "esaurito" in reason.lower() or "research" in reason.lower()
+        assert "esaurito" in reason.lower() or "ricerche" in reason.lower()
 
     def test_true_if_unlimited(self):
         lic = TenantLicense.create_onpremise("default")
@@ -100,7 +100,7 @@ class TestCanUseResearch:
 
 
 class TestCanUseCustomSkills:
-    def test_false_on_trial(self):
+    def test_false_on_developer(self):
         lic = TenantLicense.create_trial("t-001")
         can, reason = lic.can_use_custom_skills()
         assert can is False
@@ -112,6 +112,55 @@ class TestCanUseCustomSkills:
             projects_total=plan.projects_total,
         )
         can, _ = lic.can_use_custom_skills()
+        assert can is True
+
+
+class TestCanConfigureLlm:
+    def test_false_over_limit_on_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        can, reason = lic.can_configure_llm(3)
+        assert can is False
+        assert "2 provider" in reason
+
+    def test_true_within_limit_on_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        can, _ = lic.can_configure_llm(2)
+        assert can is True
+
+    def test_true_unlimited_on_team(self):
+        lic = TenantLicense.create_onpremise("default")
+        can, _ = lic.can_configure_llm(3)
+        assert can is True
+
+
+class TestCanStartExecution:
+    def test_true_under_limit_on_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        can, _ = lic.can_start_execution(2.5)
+        assert can is True
+
+    def test_false_over_limit_on_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        can, reason = lic.can_start_execution(3.5)
+        assert can is False
+        assert "3.0 ore" in reason
+
+    def test_true_unlimited_on_team(self):
+        lic = TenantLicense.create_onpremise("default")
+        can, _ = lic.can_start_execution(100)
+        assert can is True
+
+
+class TestCanUseRemoteSandbox:
+    def test_false_on_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        can, reason = lic.can_use_remote_sandbox()
+        assert can is False
+        assert "sandbox remoto" in reason
+
+    def test_true_on_team(self):
+        lic = TenantLicense.create_onpremise("default")
+        can, _ = lic.can_use_remote_sandbox()
         assert can is True
 
 
@@ -226,7 +275,7 @@ class TestUpgradeLicense:
     async def test_upgrade_creates_correct_plan(self, repo):
         new_lic = await repo.upgrade_license("t-001", "team", "PUR-001")
         assert new_lic.plan_name == "team"
-        assert new_lic.projects_total == 5
+        assert new_lic.projects_total == -1
         assert new_lic.purchase_reference == "PUR-001"
 
     @pytest.mark.asyncio
@@ -235,7 +284,7 @@ class TestUpgradeLicense:
         lic.projects_activated = 1
         lic.execution_sessions_count = 10
         await repo.set_license(lic)
-        new_lic = await repo.upgrade_license("t-001", "starter", "PUR-002")
+        new_lic = await repo.upgrade_license("t-001", "developer", "PUR-002")
         assert new_lic.projects_activated == 1
         assert new_lic.execution_sessions_count == 10
         assert new_lic.research_sessions_used == 0  # Reset
@@ -278,18 +327,67 @@ class TestOnPremiseEnforcement:
 
 class TestNoxenPlans:
     def test_all_plans_exist(self):
-        expected = {"trial", "starter", "team", "scale", "enterprise"}
+        expected = {"developer", "team"}
         assert set(NOXEN_PLANS.keys()) == expected
 
-    def test_trial_limits(self):
-        p = NOXEN_PLANS["trial"]
-        assert p.projects_total == 1
+    def test_developer_limits(self):
+        p = NOXEN_PLANS["developer"]
+        assert p.projects_limit == 1
+        assert p.llm_providers_limit == 2
         assert p.board_enabled is False
-        assert p.research_sessions_total == 3
+        assert p.execution_hours_day == 3.0
+        assert p.research_sessions_month == 50
         assert p.price_eur == 0.0
 
-    def test_enterprise_unlimited(self):
-        p = NOXEN_PLANS["enterprise"]
-        assert p.projects_total == -1
-        assert p.duration_days == -1
-        assert p.research_sessions_total == -1
+    def test_team_unlimited(self):
+        p = NOXEN_PLANS["team"]
+        assert p.projects_limit == -1
+        assert p.llm_providers_limit == -1
+        assert p.board_enabled is True
+        assert p.execution_hours_day == -1
+        assert p.research_sessions_month == -1
+        assert p.price_eur == 899.0
+
+    def test_create_trial_uses_developer(self):
+        lic = TenantLicense.create_trial("t-001")
+        assert lic.plan_name == "developer"
+
+    def test_create_onpremise_uses_team(self):
+        lic = TenantLicense.create_onpremise("default")
+        assert lic.plan_name == "team"
+
+
+# ── Execution Hours Tests ──────────────────────────────────────────
+
+
+class TestExecutionHoursRepo:
+    @pytest.mark.asyncio
+    async def test_get_execution_hours_today_initial(self, repo):
+        hours = await repo.get_execution_hours_today("t-001")
+        assert hours == 0.0
+
+    @pytest.mark.asyncio
+    async def test_add_execution_time_accumulates(self, repo):
+        await repo.add_execution_time("t-001", 1.5)
+        await repo.add_execution_time("t-001", 0.5)
+        hours = await repo.get_execution_hours_today("t-001")
+        assert hours == 2.0
+
+    @pytest.mark.asyncio
+    async def test_can_start_execution_today_false_after_limit(self, repo):
+        # Set up developer license
+        lic = TenantLicense.create_trial("t-001")
+        await repo.set_license(lic)
+        # Add 3 hours
+        await repo.add_execution_time("t-001", 3.0)
+        can, reason = await repo.can_start_execution_today("t-001")
+        assert can is False
+        assert "3.0 ore" in reason
+
+    @pytest.mark.asyncio
+    async def test_can_start_execution_today_true_under_limit(self, repo):
+        lic = TenantLicense.create_trial("t-001")
+        await repo.set_license(lic)
+        await repo.add_execution_time("t-001", 1.0)
+        can, _ = await repo.can_start_execution_today("t-001")
+        assert can is True

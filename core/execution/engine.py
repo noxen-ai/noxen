@@ -146,11 +146,23 @@ class ExecutionEngine:
             project_name = project_path.rstrip("/").split("/")[-1]
 
         # ── License enforcement ──
+        _repo = None
+        _tenant_id = None
+        _start_time = datetime.now(timezone.utc)
         try:
             from core.tenants.repository import TenantRepository
             from core.qdrant_client import DEFAULT_TENANT
             _repo = TenantRepository()
             _tenant_id = DEFAULT_TENANT
+
+            # Check execution hours limit
+            _can, _reason = await _repo.can_start_execution_today(_tenant_id)
+            if not _can:
+                yield {"phase": "license_error", "run_id": run_id,
+                       "message": _reason, "upgrade_url": "https://noxen.ai/upgrade",
+                       "done": True}
+                return
+
             _can, _reason = await _repo.activate_project(
                 tenant_id=_tenant_id,
                 project_name=project_name,
@@ -318,6 +330,15 @@ class ExecutionEngine:
             )
 
         finally:
+            # Track execution time
+            try:
+                if _repo and _tenant_id:
+                    elapsed = (datetime.now(timezone.utc) - _start_time).total_seconds()
+                    session_hours = elapsed / 3600.0
+                    await _repo.add_execution_time(_tenant_id, session_hours)
+            except Exception as _te:
+                logger.warning("engine.time_tracking_failed", error=str(_te))
+
             # Cleanup sandbox
             if self._sandbox_info:
                 await self._sandbox_mgr.cleanup(self._sandbox_info.sandbox_id)

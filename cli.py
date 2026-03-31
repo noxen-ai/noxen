@@ -34,7 +34,7 @@ def main():
 
     # init
     p_init = sub.add_parser("init", help="Inizializza su un progetto")
-    p_init.add_argument("project_path", help="Path del progetto da analizzare")
+    p_init.add_argument("project_path", nargs="?", default="", help="Path del progetto (opzionale)")
 
     # start
     sub.add_parser("start", help="Avvia il server Noxen")
@@ -87,7 +87,7 @@ def main():
 def cmd_start():
     """Avvia il server."""
     console.print(Panel.fit(
-        "[bold cyan]Noxen[/] v0.1.0\n"
+        "[bold cyan]Noxen[/] v0.3.0\n"
         f"Server: {BASE_URL}\n"
         "Dashboard: apri nel browser",
         title="Starting",
@@ -104,59 +104,144 @@ def cmd_start():
     )
 
 
-async def cmd_init(project_path: str):
-    """Inizializza l'orchestratore."""
-    path = Path(project_path).expanduser().resolve()
-    if not path.is_dir():
-        console.print(f"[red]Errore: {path} non e' una directory[/]")
+async def cmd_init(project_path: str = ""):
+    """Flusso completo di inizializzazione Noxen.
+
+    1. Check se gia' autenticato
+    2. Device auth flow se no license key
+    3. Scelta modalita' progetto
+    4. Configurazione LLM
+    5. Avvio
+    """
+    from config.settings import settings
+
+    print("\nWelcome to Noxen v0.3.0")
+    print("=" * 40)
+
+    # Step 1: Autenticazione
+    if not settings.noxen_license_key:
+        print("\nStep 1/3 -- Authentication")
+        print("You need a license key to use Noxen.")
+        print("Press Enter to open noxen.ai in your browser...")
+        input()
+        try:
+            key = await device_auth_flow(
+                server_url=settings.license_server_url
+            )
+            save_license_key(key)
+            print("\n> Authenticated")
+            print("> License key saved to .env")
+        except KeyboardInterrupt:
+            print("\nCancelled.")
+            return
+        except Exception as e:
+            print(f"\n✗ Authentication failed: {e}")
+            print("Manual setup: noxen.ai/dashboard")
+            return
+    else:
+        print("> Already authenticated")
+
+    # Step 2: Scelta modalita' progetto
+    print("\nStep 2/3 -- Project Setup")
+    print("How do you want to work?")
+    print("  1. Use existing project (as-is)")
+    print("  2. Create a sandbox copy (safe)")
+    print()
+
+    choice = input("Choose [1/2]: ").strip()
+
+    if choice == "2":
+        if not project_path:
+            project_path = input("Project path: ").strip()
+        if not Path(project_path).exists():
+            print(f"✗ Path not found: {project_path}")
+            return
+        print(f"\n> Sandbox will be created from {project_path}")
+        print("  A copy will be made in your local data directory.")
+        save_to_env("NOXEN_PROJECT_PATH", project_path)
+        save_to_env("NOXEN_USE_SANDBOX", "true")
+    elif choice == "1":
+        if not project_path:
+            project_path = input("Project path: ").strip()
+        if not Path(project_path).exists():
+            print(f"✗ Path not found: {project_path}")
+            return
+        print(f"\n> Using project: {project_path}")
+        save_to_env("NOXEN_PROJECT_PATH", project_path)
+        save_to_env("NOXEN_USE_SANDBOX", "false")
+    else:
+        print("✗ Invalid choice")
         return
 
-    console.print(Panel.fit(
-        f"[bold cyan]Noxen Init[/]\n"
-        f"Progetto: {path}",
-        title="Inizializzazione",
-    ))
+    # Step 3: Configurazione LLM
+    print("\nStep 3/3 -- LLM Configuration")
 
-    try:
-        async with httpx.AsyncClient(timeout=300) as client:
-            console.print("[yellow]Scansione e indicizzazione in corso...[/]")
-            resp = await client.post(
-                f"{BASE_URL}/api/orchestrator/init",
-                json={"project_path": str(path)},
-            )
-            resp.raise_for_status()
-            data = resp.json()
+    plan = await get_plan_from_key(
+        settings.noxen_license_key,
+        settings.license_server_url,
+    )
 
-        # Mostra risultati
-        table = Table(title="Risultati Init")
-        table.add_column("Componente", style="cyan")
-        table.add_column("Stato", style="green")
+    provider_map = {
+        "1": ("claude", "NOXEN_ANTHROPIC_API_KEY"),
+        "2": ("gemini", "NOXEN_GEMINI_API_KEY"),
+        "3": ("openai", "NOXEN_OPENAI_API_KEY"),
+        "4": ("grok", "NOXEN_GROK_API_KEY"),
+        "5": ("qwen", "NOXEN_QWEN_API_KEY"),
+        "6": ("ollama", None),
+    }
 
-        discovery = data.get("discovery", {})
-        table.add_row("Microservizi", str(discovery.get("services", 0)))
-        table.add_row("Linguaggi", ", ".join(discovery.get("languages", [])))
-        table.add_row("Framework", ", ".join(discovery.get("frameworks", [])))
+    if plan == "developer":
+        print("Developer plan: max 2 LLM providers")
+        print("\nAvailable providers:")
+        print("  1. Anthropic Claude")
+        print("  2. Google Gemini")
+        print("  3. OpenAI")
+        print("  4. Ollama (local)")
+        print()
+        print("Select up to 2 providers.")
+    else:
+        print("Team plan: all providers available")
+        print("\nAvailable providers:")
+        print("  1. Anthropic Claude")
+        print("  2. Google Gemini")
+        print("  3. OpenAI")
+        print("  4. xAI Grok")
+        print("  5. Qwen")
+        print("  6. Ollama (local)")
+        print()
 
-        db = data.get("database", {})
-        table.add_row(
-            "Database",
-            f"{'Connesso' if db.get('connected') else 'Non connesso'} "
-            f"({db.get('tables', 0)} tabelle)"
-        )
+    providers_input = input("Select providers (e.g. 1,2): ").strip()
+    selected = [p.strip() for p in providers_input.split(",")]
 
-        idx = data.get("indexing", {})
-        table.add_row("Indicizzazione", f"{idx.get('services_queued', 0)} servizi in coda")
+    if plan == "developer" and len(selected) > 2:
+        print("✗ Developer plan supports max 2 providers. Selecting first 2.")
+        selected = selected[:2]
 
-        sk = data.get("skills", {})
-        table.add_row("Skills Claude", str(sk.get("available", 0)))
+    configured = []
+    for sel in selected:
+        if sel not in provider_map:
+            continue
+        name, env_key = provider_map[sel]
+        if env_key:
+            api_key = input(f"  {name} API key: ").strip()
+            if api_key:
+                save_to_env(env_key, api_key)
+                configured.append(name)
+        else:
+            configured.append(name)
 
-        console.print(table)
-        console.print("\n[green]Init completato! Apri http://localhost:8400 per la dashboard.[/]")
+    if configured:
+        save_to_env("NOXEN_ACTIVE_PROVIDER", configured[0])
+        print(f"\n> Configured: {', '.join(configured)}")
 
-    except httpx.ConnectError:
-        console.print("[red]Server non raggiungibile. Esegui prima: noxen start[/]")
-    except Exception as e:
-        console.print(f"[red]Errore: {e}[/]")
+    print("\n" + "=" * 40)
+    print("> Noxen is ready!")
+    print("\nStart the server:")
+    print("  docker-compose up -d")
+    print("\nOpen dashboard:")
+    print("  https://app.noxen.ai")
+    print("  or http://localhost:8400")
+    print()
 
 
 async def cmd_status():
@@ -325,6 +410,45 @@ def save_license_key(key: str, env_file: str = ".env") -> None:
                 f.write(f"\nNOXEN_LICENSE_KEY={key}\n")
     else:
         env_path.write_text(f"NOXEN_LICENSE_KEY={key}\n")
+
+
+def save_to_env(key: str, value: str, env_file: str = ".env"):
+    """Aggiunge o aggiorna una variabile nel .env."""
+    env_path = Path(env_file)
+    if env_path.exists():
+        content = env_path.read_text()
+        lines = content.splitlines()
+        new_lines = []
+        found = False
+        for line in lines:
+            if line.startswith(f"{key}="):
+                new_lines.append(f"{key}={value}")
+                found = True
+            else:
+                new_lines.append(line)
+        if not found:
+            new_lines.append(f"{key}={value}")
+        env_path.write_text("\n".join(new_lines) + "\n")
+    else:
+        with env_path.open("a") as f:
+            f.write(f"{key}={value}\n")
+
+
+async def get_plan_from_key(key: str, server_url: str) -> str:
+    """Recupera il piano dalla license key."""
+    if not key:
+        return "developer"
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{server_url}/v1/license/validate",
+                json={"key": key},
+                timeout=5.0,
+            )
+            data = r.json()
+            return data.get("plan", "developer")
+    except Exception:
+        return "developer"
 
 
 async def cmd_auth():
