@@ -37,3 +37,9 @@ skills/
 
 # Logs
 *.log
+hetzcl
+hetzcl.pub
+*.pub
+.neural-hub/
+.neural/
+.noxen/
