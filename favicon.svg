@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="ember" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b68"/>
+      <stop offset="100%" stop-color="#ff5451"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#131313"/>
+
+  <!-- The "N" letterform - simplified for small size -->
+  <path d="
+    M 7 25 L 7 7
+    L 10.5 7
+    L 10.5 17
+    L 21.5 7
+    L 25 7
+    L 25 25
+    L 21.5 25
+    L 21.5 15
+    L 10.5 25
+    Z
+  " fill="url(#ember)"/>
+
+  <!-- Signature red dot -->
+  <circle cx="27" cy="6" r="2" fill="#ff5451"/>
+</svg>

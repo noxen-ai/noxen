@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Quick Start */
+  .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-bottom: 32px; background: rgba(91,64,62,0.1); }
+  .quick-card { padding: 20px; background: var(--surface-low, #1c1b1b); transition: background 150ms; }
+  .quick-card:hover { background: var(--surface-bright, #393939); }
+  .quick-card h3 {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 10px; color: #fff;
+  }
+  .quick-card h3 .material-symbols-outlined { font-size: 18px; color: var(--primary-container, #ff5451); }
+  .quick-card code {
+    display: block; font-family: 'DM Mono', monospace;
+    font-size: 12px; color: var(--primary-container, #ff5451); margin-bottom: 12px;
+  }
+  .quick-card a {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #fff;
+    text-decoration: none; transition: color 0.15s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .quick-card a:hover { color: var(--primary-container, #ff5451); }
+
+  /* Stats grid */
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin-bottom: 32px; background: rgba(91,64,62,0.1); }
+
+  /* LLM banner */
+  .llm-banner {
+    display: none; background: var(--surface-low, #1c1b1b);
+    border-left: 4px solid var(--primary-container, #ff5451);
+    padding: 18px 24px; margin-bottom: 24px;
+  }
+  .llm-banner-inner {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .llm-banner-text { display: flex; align-items: center; gap: 12px; }
+  .llm-banner-text .material-symbols-outlined { font-size: 22px; color: var(--primary-container, #ff5451); }
+  .llm-banner-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #fff; margin-bottom: 4px; }
+  .llm-banner-desc { font-size: 9px; color: #52525b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Welcome section */
+  .welcome-card { margin-bottom: 32px; }
+  .welcome-header-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .welcome-pulse-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ff5451; display: inline-block;
+    animation: pulse-green 2s infinite;
+  }
+  .welcome-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #ffb3ad;
+  }
+  .welcome-title {
+    font-size: 32px; font-weight: 800; letter-spacing: -0.05em;
+    color: #fff; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .welcome-meta-row {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .welcome-expiry {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #52525b;
+  }
+
+  /* System Status grid */
+  .system-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 1px; margin-bottom: 32px; background: rgba(91,64,62,0.1);
+  }
+  .system-card {
+    padding: 20px; background: var(--surface-low, #1c1b1b);
+    transition: background 150ms;
+  }
+  .system-card:hover { background: var(--surface-bright, #393939); }
+  .system-card-label {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #52525b; margin-bottom: 8px;
+  }
+  .system-card-value {
+    font-size: 18px; font-weight: 800; color: #fff;
+    letter-spacing: -0.02em;
+  }
+  .system-card-value.online { color: var(--green, #34d399); }
+  .system-card-value.offline { color: var(--red, #ef4444); }
+  .system-card-value.ok { color: var(--green, #34d399); }
+  .system-card-value.idle { color: #71717a; }
+
+  /* Recent Events */
+  .events-list { max-height: 280px; overflow-y: auto; }
+  .event-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 12px;
+  }
+  .event-row:last-child { border-bottom: none; }
+  .event-time {
+    width: 50px; flex-shrink: 0;
+    font-family: 'DM Mono', monospace; font-size: 11px; color: #52525b;
+  }
+  .event-type {
+    font-weight: 700; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.05em; min-width: 80px;
+  }
+  .event-type.board { color: #818cf8; }
+  .event-type.research { color: #22d3ee; }
+  .event-type.engine { color: #34d399; }
+  .event-type.notification { color: #fbbf24; }
+  .event-type.error { color: #ef4444; }
+  .event-type.skill { color: #a78bfa; }
+  .event-msg { color: #52525b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .events-empty {
+    text-align: center; padding: 24px; color: #52525b; font-size: 12px;
+  }
+  .btn-refresh {
+    padding: 4px 10px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ember, #ff5451); background: none; border: none;
+    cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+  .btn-refresh:hover { opacity: 0.7; }
+  .btn-refresh .material-symbols-outlined { font-size: 14px; }
+
+  @media (max-width: 768px) {
+    .overview-grid { grid-template-columns: repeat(3, 1fr); }
+    .quick-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr; }
+    .system-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Welcome -->
+<div class="welcome-card">
+  <div class="welcome-header-row">
+    <span class="welcome-pulse-dot"></span>
+    <span class="welcome-label" data-i18n="home.fleet">Dashboard</span>
+  </div>
+  <div class="welcome-title" id="welcome-title" data-i18n="home.welcome">Welcome to Noxen</div>
+  <div class="welcome-meta-row">
+    <span class="badge-noxen badge-green" id="plan-badge-meta">Developer</span>
+    <span class="welcome-expiry" id="license-expiry">Loading...</span>
+  </div>
+</div>
+
+<!-- Upgrade Banner (Developer plan) -->
+<div class="upgrade-banner" id="upgrade-banner">
+  <div class="upgrade-banner-inner">
+    <div class="upgrade-banner-text">
+      <span class="material-symbols-outlined">rocket_launch</span>
+      <div>
+        <div class="upgrade-banner-title" data-i18n="home.upgrade_title">Unlock Team Features</div>
+        <div class="upgrade-banner-desc" data-i18n="home.upgrade_desc">Multi-user access, advanced analytics, priority support, and unlimited research sessions.</div>
+      </div>
+    </div>
+    <a href="https://noxen.ai/pricing" target="_blank" class="btn-kinetic" style="text-decoration:none;white-space:nowrap">Upgrade &rarr;</a>
+  </div>
+</div>
+
+<!-- LLM Banner -->
+<div class="llm-banner" id="llm-banner">
+  <div class="llm-banner-inner">
+    <div class="llm-banner-text">
+      <span class="material-symbols-outlined">warning</span>
+      <div>
+        <div class="llm-banner-title" data-i18n="home.llm_banner">Configure your LLM providers to use Noxen</div>
+        <div class="llm-banner-desc" data-i18n="home.llm_banner_desc">Noxen Board deliberation requires at least 2 LLM providers.</div>
+      </div>
+    </div>
+    <a href="/settings" class="btn-kinetic" style="text-decoration:none;white-space:nowrap">Configure &rarr;</a>
+  </div>
+</div>
+
+<!-- System Overview -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.sys_overview">System Overview</div>
+  <div class="section-desc" data-i18n="home.sys_overview_desc">Real-time status of your Noxen instance. Monitor active skills, registered projects, research sessions, and knowledge base size.</div>
+</div>
+<div class="overview-grid">
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">psychology</span>
+      <span>Skills</span>
+    </div>
+    <div class="overview-value" id="skills-count">-</div>
+    <div class="overview-meta"><span class="active" id="skills-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">smart_toy</span>
+      <span>Agents</span>
+    </div>
+    <div class="overview-value" id="agents-count">-</div>
+    <div class="overview-meta"><span id="agents-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">folder_open</span>
+      <span>Projects</span>
+    </div>
+    <div class="overview-value" id="projects-count">-</div>
+    <div class="overview-meta"><span id="projects-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">science</span>
+      <span>Research</span>
+    </div>
+    <div class="overview-value" id="research-count">-</div>
+    <div class="overview-meta"><span id="research-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">database</span>
+      <span>Knowledge</span>
+    </div>
+    <div class="overview-value" id="knowledge-count">-</div>
+    <div class="overview-meta"><span id="knowledge-label">Loading...</span></div>
+  </div>
+</div>
+
+<!-- System Status -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.sys_status">System Status</div>
+  <div class="section-desc" data-i18n="home.sys_status_desc">Real-time status of the local Noxen server, LLM provider, vector database, and orchestration engine.</div>
+</div>
+<div class="system-grid">
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.server">Server</div>
+    <div class="system-card-value" id="sys-server">Checking...</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.llm_provider">LLM Provider</div>
+    <div class="system-card-value" id="sys-llm">-</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label">Qdrant</div>
+    <div class="system-card-value" id="sys-qdrant">-</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.engine">Engine</div>
+    <div class="system-card-value" id="sys-engine">-</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.tenant">Tenant</div>
+    <div class="system-card-value" id="sys-tenant">-</div>
+  </div>
+</div>
+
+<!-- LLM Spending -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.spending">LLM Spending</div>
+  <div class="section-desc" data-i18n="home.spending_desc">Current month token usage per active model.</div>
+</div>
+<div class="system-grid" id="spending-grid" style="grid-template-columns:repeat(3,1fr)">
+  <div class="system-card" style="text-align:center;padding:32px 20px;grid-column:1/-1">
+    <div class="system-card-label">Loading...</div>
+  </div>
+</div>
+
+<!-- Routing Intelligence -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.routing">Routing Intelligence</div>
+  <div class="section-desc" data-i18n="home.routing_desc">Neural Router telemetry — tracks every model selection decision for R&D training data.</div>
+</div>
+<div class="system-grid" id="routing-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.decisions">Decisions</div>
+    <div class="system-card-value" id="rt-decisions">0</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.success_rate">Success Rate</div>
+    <div class="system-card-value ok" id="rt-success">-</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.avg_latency">Avg Latency</div>
+    <div class="system-card-value" id="rt-latency">-</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.total_cost">Total Cost</div>
+    <div class="system-card-value" id="rt-cost" style="color:var(--ember,#ff5451)">$0.00</div>
+  </div>
+  <div class="system-card">
+    <div class="system-card-label" data-i18n="home.mode">Mode</div>
+    <div class="system-card-value" id="rt-mode" style="font-size:13px;color:#fbbf24" data-i18n="home.shadow">Shadow</div>
+  </div>
+</div>
+<div id="routing-models-grid" class="system-grid" style="grid-template-columns:repeat(3,1fr);margin-top:1px"></div>
+
+<!-- Recent Events -->
+<div class="section-header" style="display:flex;justify-content:space-between;align-items:center">
+  <div>
+    <div class="section-label" data-i18n="home.events">Recent Events</div>
+  </div>
+  <button class="btn-refresh" onclick="loadRecentEvents()">
+    <span class="material-symbols-outlined">refresh</span> <span data-i18n="home.refresh">Refresh</span>
+  </button>
+</div>
+<div class="noxen-card-ember" style="padding:16px;margin-bottom:32px">
+  <div class="events-list" id="events-list">
+    <div class="events-empty">Loading events...</div>
+  </div>
+</div>
+
+<!-- Quick Start -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.quickstart">Quick Start</div>
+  <div class="section-desc" data-i18n="home.quickstart_desc">Get Noxen running on your infrastructure in 3 steps. Clone, configure your environment, and launch with Docker.</div>
+</div>
+<div class="quick-grid">
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">download</span> Install</h3>
+    <code>git clone github.com/noxen-ai/noxen</code>
+    <a href="https://github.com/noxen-ai/noxen" target="_blank">View on GitHub &rarr;</a>
+  </div>
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">settings</span> Configure</h3>
+    <code>cp .env.example .env</code>
+    <a href="/docs">Read docs &rarr;</a>
+  </div>
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">play_arrow</span> Run</h3>
+    <code>docker-compose up -d</code>
+    <a href="http://localhost:8400" target="_blank">Open dashboard &rarr;</a>
+  </div>
+</div>
+
+<!-- Quick Links -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.quick_links">Quick Links</div>
+</div>
+<div class="quick-grid">
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">history</span> History</h3>
+    <code>noxen generate-code</code>
+    <a href="/history">View execution history &rarr;</a>
+  </div>
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">chat</span> Conversations</h3>
+    <code>RAG chat sessions</code>
+    <a href="/conversations">View all conversations &rarr;</a>
+  </div>
+  <div class="noxen-card quick-card">
+    <h3><span class="material-symbols-outlined">help_center</span> Support</h3>
+    <code>FAQ &amp; contact</code>
+    <a href="/support">Get help &rarr;</a>
+  </div>
+</div>
+
+<!-- Plan & Usage -->
+<div class="section-header">
+  <div class="section-label" data-i18n="home.plan_usage">Plan &amp; Usage</div>
+  <div class="section-desc" data-i18n="home.plan_desc">Your current license tier and resource consumption. Upgrade or manage your subscription from the admin panel.</div>
+</div>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label" data-i18n="home.current_plan">Current Plan</div>
+    <div class="stat-value" id="stat-plan">-</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label" data-i18n="home.license_exp">License Expires</div>
+    <div class="stat-value" id="stat-expires">-</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Projects</div>
+    <div class="stat-value" id="stat-projects">-</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label" data-i18n="home.research_used">Research Used</div>
+    <div class="stat-value" id="stat-research">-</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/api.js"></script>
+<script>
+  // (API key moved to /token page)
+
+  // Load license info
+  document.addEventListener('noxen:license-loaded', function(e) {
+    var lic = e.detail;
+    var plan = lic.plan_name || 'developer';
+    var canonicalMap = {free:'Developer', pro:'Developer', enterprise:'Team', developer:'Developer', team:'Team'};
+    var planUpper = canonicalMap[plan] || plan.charAt(0).toUpperCase() + plan.slice(1);
+
+    var badgeMeta = document.getElementById('plan-badge-meta');
+    if (badgeMeta) {
+      badgeMeta.textContent = planUpper;
+      badgeMeta.className = (plan === 'team' || plan === 'enterprise') ? 'badge-noxen badge-ember' : 'badge-noxen badge-green';
+    }
+
+    var expires = lic.expires_at ? new Date(lic.expires_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Never';
+    var expiryEl = document.getElementById('license-expiry');
+    if (expiryEl) expiryEl.textContent = 'Valid until ' + expires;
+
+    var sp = document.getElementById('stat-plan');
+    if (sp) sp.textContent = planUpper;
+    var se = document.getElementById('stat-expires');
+    if (se) se.textContent = lic.days_remaining !== null && lic.days_remaining !== undefined ? lic.days_remaining + 'd' : '\u221e';
+    var spr = document.getElementById('stat-projects');
+    if (spr) spr.textContent = lic.projects_activated + '/' + (lic.projects_total === -1 ? '\u221e' : lic.projects_total);
+    var sr = document.getElementById('stat-research');
+    if (sr) sr.textContent = lic.research_sessions_used + '/' + (lic.research_sessions_total === -1 ? '\u221e' : lic.research_sessions_total);
+
+    // Research overview card
+    var rUsed = lic.research_sessions_used || 0;
+    var rTotal = lic.research_sessions_total === -1 ? '\u221e' : lic.research_sessions_total;
+    var ovr = document.getElementById('research-count');
+    if (ovr) ovr.textContent = rUsed;
+    var ovrm = document.getElementById('research-label');
+    if (ovrm) { ovrm.textContent = 'of ' + rTotal + ' sessions used'; ovrm.className = rUsed > 0 ? 'active' : ''; }
+
+    // Show upgrade banner for developer/free plan
+    if (plan === 'developer' || plan === 'free') {
+      var banner = document.getElementById('upgrade-banner');
+      if (banner) banner.classList.add('visible');
+    }
+  });
+
+  document.addEventListener('noxen:user-loaded', function(e) {
+    var me = e.detail;
+    var wt = document.getElementById('welcome-title');
+    if (wt) wt.textContent = 'Welcome back, ' + (me.name || me.email);
+  });
+
+  // Load system overview stats
+  async function loadOverview() {
+    var sessionToken = localStorage.getItem('noxen_session_token');
+    var h = { 'X-Session-Token': sessionToken };
+
+    // KB Stats
+    try {
+      var res = await fetch('/api/auth/kb-stats', { headers: h });
+      console.log('KB stats status:', res.status);
+      if (res.ok) {
+        var d = await res.json();
+        console.log('KB stats data:', d);
+
+        var skillsEl = document.getElementById('skills-count');
+        var agentsEl = document.getElementById('agents-count');
+        var knowledgeEl = document.getElementById('knowledge-count');
+
+        if (skillsEl) skillsEl.textContent = (d.skills || 0).toLocaleString();
+        if (agentsEl) agentsEl.textContent = (d.agents || 0).toLocaleString();
+        if (knowledgeEl) knowledgeEl.textContent = (d.total || 0).toLocaleString();
+
+        var skillsLabel = document.getElementById('skills-label');
+        var agentsLabel = document.getElementById('agents-label');
+        var knowledgeLabel = document.getElementById('knowledge-label');
+
+        if (skillsLabel) { skillsLabel.textContent = d.skills > 0 ? 'SKILLS AVAILABLE' : 'KB NOT SYNCED'; skillsLabel.className = d.skills > 0 ? 'active' : 'warning'; }
+        if (agentsLabel) { agentsLabel.textContent = d.agents > 0 ? 'REGISTERED AGENTS' : 'NO AGENTS YET'; agentsLabel.className = d.agents > 0 ? 'active' : ''; }
+        if (knowledgeLabel) { knowledgeLabel.textContent = d.total > 0 ? 'KB DOCUMENTS' : 'EMPTY \u2014 SYNC KB'; knowledgeLabel.className = d.total > 0 ? 'active' : 'warning'; }
+      }
+    } catch (e) {
+      console.error('KB stats error:', e);
+    }
+
+    // Projects
+    try {
+      var res2 = await fetch('/api/auth/projects', { headers: h });
+      if (res2.ok) {
+        var d2 = await res2.json();
+        var el = document.getElementById('projects-count');
+        var label = document.getElementById('projects-label');
+        if (el) el.textContent = d2.count || 0;
+        if (label) { label.textContent = (d2.count || 0) === 0 ? 'NO PROJECTS YET' : (d2.count || 0) + ' ACTIVE'; label.className = (d2.count || 0) > 0 ? 'active' : ''; }
+      }
+    } catch (e) {
+      console.error('Projects error:', e);
+    }
+
+    // History/Research
+    try {
+      var res3 = await fetch('/api/auth/history', { headers: h });
+      if (res3.ok) {
+        var d3 = await res3.json();
+        var count = (d3.history || []).length;
+        var el3 = document.getElementById('research-count');
+        var label3 = document.getElementById('research-label');
+        if (el3) el3.textContent = count;
+        if (label3) { label3.textContent = count === 0 ? 'NO SESSIONS YET' : count + ' SESSIONS'; label3.className = count > 0 ? 'active' : ''; }
+      }
+    } catch (e) {
+      console.error('Research error:', e);
+    }
+  }
+
+
+  // Check LLM config status
+  async function checkLlmConfig() {
+    try {
+      var res = await fetch('/api/auth/onboarding-status', { headers: headers });
+      if (res.status === 401) { window.location.href = '/login'; return; }
+      if (!res.ok) return;
+      var status = await res.json();
+      if (!status.llm_configured) {
+        document.getElementById('llm-banner').style.display = 'block';
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  // Load system status (server, llm, qdrant, engine, tenant)
+  async function loadSystemStatus() {
+    try {
+      var res = await fetch('/api/orchestrator/status', { headers: headers });
+      if (res.ok) {
+        var data = await res.json();
+        var serverEl = document.getElementById('sys-server');
+        serverEl.textContent = 'Online';
+        serverEl.className = 'system-card-value online';
+
+        var llmEl = document.getElementById('sys-llm');
+        llmEl.textContent = data.active_provider || '-';
+
+        var engineEl = document.getElementById('sys-engine');
+        var running = data.initialized || false;
+        engineEl.textContent = running ? 'Running' : 'Idle';
+        engineEl.className = 'system-card-value ' + (running ? 'ok' : 'idle');
+
+        var tenantEl = document.getElementById('sys-tenant');
+        tenantEl.textContent = data.tenant_name || data.project_name || 'Default';
+      } else {
+        document.getElementById('sys-server').textContent = 'Offline';
+        document.getElementById('sys-server').className = 'system-card-value offline';
+      }
+    } catch(e) {
+      document.getElementById('sys-server').textContent = 'Offline';
+      document.getElementById('sys-server').className = 'system-card-value offline';
+    }
+
+    // Qdrant
+    try {
+      var res2 = await fetch('/api/knowledge/status', { headers: headers });
+      if (res2.ok) {
+        var data2 = await res2.json();
+        var qdrantEl = document.getElementById('sys-qdrant');
+        qdrantEl.textContent = data2.healthy ? 'OK' : 'Down';
+        qdrantEl.className = 'system-card-value ' + (data2.healthy ? 'ok' : 'offline');
+      }
+    } catch(e) {
+      document.getElementById('sys-qdrant').textContent = '-';
+    }
+  }
+
+  // Load recent events
+  async function loadRecentEvents() {
+    try {
+      var res = await fetch('/api/events/recent?limit=20', { headers: headers });
+      if (!res.ok) { renderEvents([]); return; }
+      var events = await res.json();
+      renderEvents(Array.isArray(events) ? events : []);
+    } catch(e) {
+      renderEvents([]);
+    }
+  }
+
+  function renderEvents(events) {
+    var list = document.getElementById('events-list');
+    list.textContent = '';
+
+    if (events.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'events-empty';
+      empty.textContent = 'No events yet';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var row = document.createElement('div');
+      row.className = 'event-row';
+
+      var time = document.createElement('span');
+      time.className = 'event-time';
+      if (ev.timestamp) {
+        try {
+          var d = new Date(ev.timestamp);
+          time.textContent = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) { time.textContent = ''; }
+      }
+      row.appendChild(time);
+
+      var typeEl = document.createElement('span');
+      var evSource = ev.source || ev.type || ev.event_type || '';
+      typeEl.className = 'event-type ' + evSource;
+      typeEl.textContent = ev.type || ev.event_type || evSource;
+      row.appendChild(typeEl);
+
+      var msg = document.createElement('span');
+      msg.className = 'event-msg';
+      msg.textContent = (ev.data && ev.data.message) || ev.summary || '';
+      row.appendChild(msg);
+
+      list.appendChild(row);
+    }
+  }
+
+  // Load LLM spending per active model
+  async function loadSpending() {
+    try {
+      var modelsRes = await NoxenAPI.llmModels();
+      var usageRes = await NoxenAPI.llmUsageSummary('month');
+
+      var activeModels = (modelsRes.models || []).filter(function(m) { return m.enabled !== false; });
+      var byModel = usageRes.by_model || [];
+
+      var grid = document.getElementById('spending-grid');
+      grid.textContent = '';
+
+      if (activeModels.length === 0) {
+        grid.style.gridTemplateColumns = '1fr';
+        var empty = document.createElement('div');
+        empty.className = 'system-card';
+        empty.style.textAlign = 'center';
+        empty.style.padding = '32px 20px';
+        empty.innerHTML = '<div class="system-card-label">No active models</div><div class="system-card-value" style="font-size:13px;color:#52525b">Configure models in Settings</div>';
+        grid.appendChild(empty);
+        return;
+      }
+
+      // Determine grid columns (max 4 per row)
+      var cols = Math.min(activeModels.length, 4);
+      grid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+      for (var i = 0; i < activeModels.length; i++) {
+        var model = activeModels[i];
+        var usage = null;
+        for (var j = 0; j < byModel.length; j++) {
+          if (byModel[j].provider === model.provider && byModel[j].model === model.model) {
+            usage = byModel[j]; break;
+          }
+        }
+
+        var calls = usage ? (usage.calls || 0) : 0;
+        var tokIn = usage ? (usage.tokens_in || 0) : 0;
+        var tokOut = usage ? (usage.tokens_out || 0) : 0;
+
+        var card = document.createElement('div');
+        card.className = 'system-card';
+        card.innerHTML =
+          '<div class="system-card-label" style="margin-bottom:4px">' + model.provider.toUpperCase() + '</div>' +
+          '<div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + model.model + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#52525b">Calls</span><span style="color:#fff;font-weight:700">' + calls.toLocaleString() + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#52525b">Tokens In</span><span style="color:#fff;font-weight:700">' + tokIn.toLocaleString() + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:#52525b">Tokens Out</span><span style="color:#fff;font-weight:700">' + tokOut.toLocaleString() + '</span></div>' +
+          '</div>';
+        grid.appendChild(card);
+      }
+    } catch(e) { /* silent */ }
+  }
+
+  // Load routing intelligence analytics
+  async function loadRoutingAnalytics() {
+    try {
+      var data = await NoxenAPI.routingAnalytics('month');
+
+      var dec = document.getElementById('rt-decisions');
+      if (dec) dec.textContent = (data.total_decisions || 0).toLocaleString();
+
+      var suc = document.getElementById('rt-success');
+      if (suc) {
+        var rate = data.success_rate || 0;
+        suc.textContent = rate + '%';
+        suc.className = 'system-card-value ' + (rate >= 90 ? 'ok' : rate >= 70 ? '' : 'offline');
+      }
+
+      var lat = document.getElementById('rt-latency');
+      if (lat) lat.textContent = (data.avg_latency_ms || 0) + 'ms';
+
+      var cost = document.getElementById('rt-cost');
+      if (cost) cost.textContent = '$' + (data.total_cost_usd || 0).toFixed(2);
+
+      // Per-model breakdown
+      var modelsGrid = document.getElementById('routing-models-grid');
+      modelsGrid.textContent = '';
+      var models = data.by_model || [];
+      if (models.length === 0) return;
+
+      var cols = Math.min(models.length, 4);
+      modelsGrid.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+
+      for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        var card = document.createElement('div');
+        card.className = 'system-card';
+        card.innerHTML =
+          '<div class="system-card-label" style="margin-bottom:4px">' + m.provider.toUpperCase() + '</div>' +
+          '<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + m.model + '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:4px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:#52525b">Calls</span><span style="color:#fff;font-weight:700">' + m.calls + '</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:#52525b">Success</span><span style="color:' + (m.success_rate >= 90 ? '#34d399' : '#ff5451') + ';font-weight:700">' + m.success_rate + '%</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:#52525b">Avg Latency</span><span style="color:#fff;font-weight:700">' + m.avg_latency_ms + 'ms</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:#52525b">Cost</span><span style="color:#ff5451;font-weight:700">$' + m.cost_usd.toFixed(4) + '</span></div>' +
+          '</div>';
+        modelsGrid.appendChild(card);
+      }
+    } catch(e) { /* silent */ }
+  }
+
+  // Init page
+  loadOverview();
+  loadSystemStatus();
+  loadRecentEvents();
+  checkLlmConfig();
+  loadSpending();
+  loadRoutingAnalytics();
+</script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    corePlugins: { preflight: false },
+    theme: {
+      extend: {
+        colors: {
+          "surface-container-highest": "#353534",
+          "surface-container": "#201f1f",
+          "surface-container-high": "#2a2a2a",
+          "surface-container-low": "#1c1b1b",
+          "surface-container-lowest": "#0e0e0e",
+          "surface-dim": "#131313",
+          "surface-bright": "#393939",
+          "primary-container": "#ff5451",
+          "primary": "#ffb3ad",
+          "on-surface": "#e5e2e1",
+          "on-surface-variant": "#e4beba",
+          "outline-variant": "#5b403e",
+          "tertiary": "#69d8d4",
+          void:    { DEFAULT: '#131313', 2: '#1c1b1b', 3: '#201f1f' },
+          shigh:   '#2a2a2a',
+          shighest:'#353534',
+          ember:   { DEFAULT: '#ff5451', glow: '#ffb3ad' },
+          frost:   '#e5e2e1',
+          muted:   '#6b7280',
+          outline: 'rgba(255,255,255,0.06)',
+        },
+        fontFamily: { "headline": ["Manrope"], "body": ["Manrope"] },
+        borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+      }
+    }
+  }
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title" data-i18n="nav.notifications">Notifications</div>
+  <div class="page-desc" data-i18n="notifications.desc">Notification channels and pending approval requests.</div>
+</div>
+
+<div x-data="notificationsComponent()" x-init="init()">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Channels -->
+    <div class="noxen-card p-4">
+      <h3 class="section-label" data-i18n="notifications.channels">Channels</h3>
+      <div class="space-y-2">
+        <template x-for="ch in channels" :key="ch.name">
+          <div class="flex items-center justify-between bg-void rounded-lg p-3">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-muted text-base" x-text="ch.name === 'telegram' ? 'send' : ch.name === 'email' ? 'email' : 'notifications'"></span>
+              <span class="text-sm text-white" x-text="ch.name"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs" :class="ch.configured ? 'text-green-400' : 'text-muted'" x-text="ch.configured ? 'Active' : 'Not configured'"></span>
+              <button @click="testChannel(ch.name)" :disabled="testingChannel === ch.name" x-show="ch.configured" class="btn-text-ember text-[10px]">
+                <span x-show="testingChannel !== ch.name" data-i18n="notifications.test">Test</span>
+                <span x-show="testingChannel === ch.name" data-i18n="notifications.sending">Sending...</span>
+              </button>
+            </div>
+          </div>
+        </template>
+        <div x-show="channels.length === 0" class="text-xs text-muted text-center py-4" data-i18n="notifications.no_channels">No channels configured</div>
+      </div>
+    </div>
+
+    <!-- Pending Approvals -->
+    <div class="noxen-card p-4">
+      <h3 class="section-label"><span data-i18n="notifications.pending_approvals">Pending Approvals</span> (<span x-text="pendingApprovals.length"></span>)</h3>
+      <div class="space-y-2 max-h-64 overflow-y-auto">
+        <template x-for="a in pendingApprovals" :key="a.approval_id">
+          <div class="bg-void rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs text-white font-medium" x-text="a.project_name || a.approval_id"></span>
+              <span class="text-[10px] font-mono text-muted" x-text="a.created_at"></span>
+            </div>
+            <div class="flex gap-2">
+              <button @click="approveRequest(a.approval_id)" class="btn-text-ember text-[10px] flex items-center gap-1">
+                <span class="material-symbols-outlined" style="font-size:14px">check_circle</span> <span data-i18n="execution.approve">Approve</span>
+              </button>
+              <button @click="rejectRequest(a.approval_id)" class="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1 px-1">
+                <span class="material-symbols-outlined" style="font-size:14px">cancel</span> <span data-i18n="execution.reject">Reject</span>
+              </button>
+            </div>
+          </div>
+        </template>
+        <div x-show="pendingApprovals.length === 0" class="text-xs text-muted text-center py-4" data-i18n="notifications.no_pending">No pending approvals</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/api.js"></script>
+<script src="/static/js/sse.js"></script>
+<script src="/static/js/components/notifications.js"></script>
+{% endblock %}

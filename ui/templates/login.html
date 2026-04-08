@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Noxen — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --void: #131313;
+      --frost: #e5e2e1;
+      --frost-dim: #71717a;
+      --ember: #ff5451;
+      --ember-glow: #ffb3ad;
+      --surface: #1c1b1b;
+      --surface-high: #2a2a2a;
+      --surface-highest: #353534;
+      --border: rgba(255,255,255,0.06);
+      --border-hover: rgba(255,255,255,0.12);
+    }
+
+    body {
+      font-family: 'Manrope', sans-serif;
+      background: var(--void);
+      color: var(--frost);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Navbar ──────────────────────── */
+    .navbar {
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: none;
+      background: var(--void);
+    }
+    .navbar-left { display: flex; align-items: center; gap: 10px; }
+    .navbar-brand {
+      font-weight: 800; font-size: 20px; letter-spacing: -0.05em;
+      text-transform: uppercase; color: #fff;
+    }
+
+    /* ── Main ───────────────────────── */
+    .main {
+      flex: 1; display: flex; align-items: center;
+      justify-content: center; padding: 40px 20px;
+    }
+
+    /* ── Card ────────────────────────── */
+    .auth-card {
+      width: 100%; max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 40px 32px;
+    }
+
+    /* ── Tab Switcher ────────────────── */
+    .tab-bar {
+      display: flex; gap: 0; margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1; padding: 12px 0; text-align: center;
+      font-family: 'Manrope', sans-serif; font-weight: 700;
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--frost-dim); background: none; border: none;
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--frost); }
+    .tab-btn.active { color: var(--ember); border-bottom-color: var(--ember); }
+
+    /* ── Form ────────────────────────── */
+    .form-group { margin-bottom: 20px; }
+    .form-label {
+      display: block; font-size: 9px; font-weight: 700;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--frost-dim); margin-bottom: 8px;
+    }
+    .form-input {
+      width: 100%; padding: 12px 16px;
+      font-family: 'DM Mono', monospace; font-size: 13px;
+      color: var(--frost); background: var(--surface-highest);
+      border: none; outline: none; transition: box-shadow 0.2s;
+    }
+    .form-input:focus { box-shadow: 0 0 0 1px var(--ember-glow); }
+    .form-input::placeholder { color: #52525b; }
+
+    /* ── CTA Button ──────────────────── */
+    .btn-cta {
+      width: 100%; padding: 14px 0;
+      font-family: 'Manrope', sans-serif; font-weight: 700;
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: #fff; background: linear-gradient(135deg, var(--ember-glow), var(--ember));
+      border: none; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn-cta:hover { opacity: 0.9; }
+    .btn-cta:active { transform: scale(0.98); opacity: 0.8; }
+    .btn-cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Error ────────────────────────── */
+    .error-msg {
+      background: rgba(255,84,81,0.06);
+      border-left: 3px solid var(--ember);
+      padding: 12px 16px; font-size: 12px; color: var(--ember);
+      margin-bottom: 20px; display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    /* ── Footer ──────────────────────── */
+    .auth-footer {
+      text-align: center; margin-top: 24px;
+      font-size: 9px; color: var(--frost-dim); line-height: 1.8;
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .auth-footer a { color: var(--ember); text-decoration: none; }
+    .auth-footer a:hover { color: #fff; }
+
+    .forgot-link {
+      display: block; text-align: right; font-size: 10px;
+      color: var(--frost-dim); text-decoration: none;
+      margin-top: -12px; margin-bottom: 24px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .forgot-link:hover { color: var(--ember); }
+
+    /* ── Hidden ───────────────────────── */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-left">
+      <img src="/static/img/logo.svg" alt="Noxen" style="height:32px;display:block">
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:9px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#52525b">Secure Access</span>
+      <span class="material-symbols-outlined" style="font-size:16px;color:#52525b">lock</span>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="auth-card">
+
+      <!-- Tab Switcher -->
+      <div class="tab-bar" id="tab-bar">
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Create Account</button>
+      </div>
+
+      <!-- Error Message -->
+      <div class="error-msg" id="error-msg"></div>
+
+      <!-- Login Form -->
+      <form id="form-login" onsubmit="submitLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="login-email" placeholder="you@company.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" type="password" id="login-password" placeholder="Enter password" required autocomplete="current-password">
+        </div>
+        <a href="/reset-password" class="forgot-link">Forgot password?</a>
+        <button type="submit" class="btn-cta" id="btn-login">Sign In</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" class="hidden" onsubmit="submitRegister(event)">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input class="form-input" type="text" id="register-name" placeholder="Your name" required autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="register-email" placeholder="you@company.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" type="password" id="register-password" placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn-cta" id="btn-register">Create Account</button>
+      </form>
+
+      <!-- Footer -->
+      <div class="auth-footer">
+        By creating an account you agree to our<br>
+        <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Tab switching ──────────────────────────
+    function switchTab(tab) {
+      var loginForm = document.getElementById('form-login');
+      var registerForm = document.getElementById('form-register');
+      var tabLogin = document.getElementById('tab-login');
+      var tabRegister = document.getElementById('tab-register');
+      var errorMsg = document.getElementById('error-msg');
+
+      errorMsg.classList.remove('visible');
+      errorMsg.textContent = '';
+
+      if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+      } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        tabLogin.classList.remove('active');
+        tabRegister.classList.add('active');
+      }
+    }
+
+    // ── Error display ──────────────────────────
+    function showError(msg) {
+      var el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    // ── Login ──────────────────────────────────
+    async function submitLogin(e) {
+      e.preventDefault();
+      var btn = document.getElementById('btn-login');
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+
+      try {
+        var res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('login-email').value,
+            password: document.getElementById('login-password').value,
+          }),
+        });
+
+        if (!res.ok) {
+          var data = await res.json().catch(function() { return {}; });
+          throw new Error(data.detail || 'Login failed');
+        }
+
+        var data = await res.json();
+        localStorage.setItem('noxen_session_token', data.session_token);
+        document.cookie = 'noxen_session=' + data.session_token + '; path=/; SameSite=Lax; max-age=86400';
+        window.location.href = getRedirectUrl('/');
+      } catch (err) {
+        showError(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    }
+
+    // ── Register ───────────────────────────────
+    async function submitRegister(e) {
+      e.preventDefault();
+      var btn = document.getElementById('btn-register');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      try {
+        var res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('register-name').value,
+            email: document.getElementById('register-email').value,
+            password: document.getElementById('register-password').value,
+          }),
+        });
+
+        if (!res.ok) {
+          var data = await res.json().catch(function() { return {}; });
+          throw new Error(data.detail || 'Registration failed');
+        }
+
+        var data = await res.json();
+        localStorage.setItem('noxen_session_token', data.session_token);
+        localStorage.setItem('noxen_api_key', data.api_key);
+        document.cookie = 'noxen_session=' + data.session_token + '; path=/; SameSite=Lax; max-age=86400';
+        window.location.href = '/';
+      } catch (err) {
+        showError(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    }
+
+    // ── Redirect helper: respects ?next= param ──
+    function getRedirectUrl(defaultUrl) {
+      var params = new URLSearchParams(window.location.search);
+      var next = params.get('next');
+      return next || defaultUrl || '/';
+    }
+
+    // ── Auto-redirect if already logged in ──
+    (function() {
+      if (localStorage.getItem('noxen_session_token')) {
+        window.location.href = getRedirectUrl('/');
+      }
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Documentation{% endblock %}
+
+{% block extra_head %}
+<style>
+  .docs-layout {
+    display: grid; grid-template-columns: 200px 1fr; gap: 32px;
+  }
+  .docs-nav {
+    position: sticky; top: 24px; align-self: start;
+  }
+  .docs-nav-title {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #52525b; margin-bottom: 12px;
+  }
+  .docs-nav a {
+    display: block; padding: 6px 0;
+    font-size: 12px; font-weight: 600; color: #71717a;
+    text-decoration: none; transition: color 0.15s;
+  }
+  .docs-nav a:hover { color: #fff; }
+  .docs-nav a.active { color: var(--primary-container, #ff5451); }
+
+  .docs-content { min-width: 0; }
+  .docs-section { margin-bottom: 40px; }
+  .docs-heading {
+    font-size: 20px; font-weight: 800; color: #fff;
+    letter-spacing: -0.03em; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--outline, rgba(255,255,255,0.06));
+  }
+  .docs-subheading {
+    font-size: 14px; font-weight: 700; color: #e5e2e1;
+    margin-top: 20px; margin-bottom: 8px;
+  }
+  .docs-text {
+    font-size: 13px; color: #71717a; line-height: 1.7;
+    margin-bottom: 12px;
+  }
+  .docs-code {
+    display: block;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--primary-container, #ff5451);
+    background: var(--surface-low, #1c1b1b);
+    padding: 14px 18px; margin-bottom: 16px;
+    line-height: 1.8; white-space: pre; overflow-x: auto;
+  }
+  .docs-inline-code {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--primary-container, #ff5451);
+    background: rgba(255,84,81,0.04); padding: 2px 6px;
+  }
+  .docs-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px; margin-bottom: 16px;
+  }
+  .docs-table th {
+    text-align: left; padding: 8px 12px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.15em;
+    text-transform: uppercase; color: #52525b;
+    border-bottom: 1px solid var(--outline);
+  }
+  .docs-table td {
+    padding: 8px 12px; color: #e5e2e1;
+    border-bottom: 1px solid var(--outline);
+  }
+  .docs-table td:first-child {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--primary-container, #ff5451); white-space: nowrap;
+  }
+
+  @media (max-width: 768px) {
+    .docs-layout { grid-template-columns: 1fr; }
+    .docs-nav { position: static; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .docs-nav a { padding: 4px 8px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title" data-i18n="nav.docs">Documentation</div>
+  <div class="page-desc" data-i18n="docs.desc">Everything you need to get started with Noxen and integrate it into your workflow.</div>
+</div>
+
+<div class="docs-layout">
+  <!-- Table of Contents -->
+  <nav class="docs-nav">
+    <div class="docs-nav-title" data-i18n="docs.on_this_page">On this page</div>
+    <a href="#getting-started" data-i18n="docs.getting_started">Getting Started</a>
+    <a href="#cli-reference" data-i18n="docs.cli_reference">CLI Reference</a>
+    <a href="#api-reference" data-i18n="docs.api_reference">API Reference</a>
+    <a href="#configuration" data-i18n="docs.configuration">Configuration</a>
+    <a href="#architecture" data-i18n="docs.architecture">Architecture</a>
+  </nav>
+
+  <!-- Content -->
+  <div class="docs-content">
+
+    <!-- Getting Started -->
+    <div class="docs-section" id="getting-started">
+      <div class="docs-heading" data-i18n="docs.getting_started">Getting Started</div>
+      <div class="docs-text">Noxen is a local AI orchestrator for multi-repo development. It analyzes your codebase, generates improvement plans, and writes code autonomously using a Board of LLM providers.</div>
+
+      <div class="docs-subheading">Installation</div>
+      <div class="docs-text">Clone the repository and set up your environment:</div>
+      <code class="docs-code">$ git clone https://github.com/noxen-ai/noxen.git
+$ cd noxen
+$ cp .env.example .env
+$ docker-compose up -d</code>
+
+      <div class="docs-subheading">Authentication</div>
+      <div class="docs-text">Authenticate the CLI with your Noxen account:</div>
+      <code class="docs-code">$ noxen auth
+# A browser window will open for authorization
+# Once confirmed, your credentials are saved locally</code>
+
+      <div class="docs-subheading">First Project</div>
+      <div class="docs-text">Register your project and run the first analysis:</div>
+      <code class="docs-code">$ cd /path/to/your/project
+$ noxen project add .
+$ noxen start</code>
+      <div class="docs-text">This runs the Spider Analysis, which scans your codebase and generates a comprehensive report available in the Reports section.</div>
+    </div>
+
+    <!-- CLI Reference -->
+    <div class="docs-section" id="cli-reference">
+      <div class="docs-heading" data-i18n="docs.cli_reference">CLI Reference</div>
+      <div class="docs-text">All available CLI commands and their usage.</div>
+
+      <table class="docs-table">
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>noxen auth</td><td>Authenticate with your Noxen account via browser-based device flow</td></tr>
+          <tr><td>noxen project add .</td><td>Register the current directory as a Noxen project</td></tr>
+          <tr><td>noxen start</td><td>Run Spider Analysis on the registered project, generating a full report</td></tr>
+          <tr><td>noxen generate-code</td><td>Execute an approved action plan, writing code changes to your project</td></tr>
+          <tr><td>noxen status</td><td>Check the status of Noxen services and current project</td></tr>
+          <tr><td>noxen research</td><td>Start an interactive research session using the knowledge base</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- API Reference -->
+    <div class="docs-section" id="api-reference">
+      <div class="docs-heading" data-i18n="docs.api_reference">API Reference</div>
+      <div class="docs-text">Noxen exposes a REST API on port 8400. All authenticated endpoints require the <span class="docs-inline-code">X-Session-Token</span> header.</div>
+
+      <div class="docs-subheading">Authentication</div>
+      <table class="docs-table">
+        <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>POST /api/auth/register</td><td>Create a new account (name, email, password)</td></tr>
+          <tr><td>POST /api/auth/login</td><td>Sign in and receive a session token</td></tr>
+          <tr><td>GET /api/auth/me</td><td>Get current user info</td></tr>
+          <tr><td>POST /api/auth/logout</td><td>Invalidate session token</td></tr>
+        </tbody>
+      </table>
+
+      <div class="docs-subheading">Projects</div>
+      <table class="docs-table">
+        <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>GET /api/projects/</td><td>List all registered projects</td></tr>
+          <tr><td>POST /api/projects/register</td><td>Register a new project</td></tr>
+          <tr><td>POST /api/projects/{name}/index</td><td>Index project into knowledge base</td></tr>
+        </tbody>
+      </table>
+
+      <div class="docs-subheading">Reports &amp; Plans</div>
+      <table class="docs-table">
+        <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>GET /api/auth/reports</td><td>List all Spider Analysis reports</td></tr>
+          <tr><td>GET /api/auth/reports/{id}</td><td>Get report detail</td></tr>
+          <tr><td>POST /api/auth/plans/generate</td><td>Generate an action plan from a report</td></tr>
+          <tr><td>POST /api/auth/plans/{id}/approve</td><td>Approve a plan for execution</td></tr>
+        </tbody>
+      </table>
+
+      <div class="docs-subheading">Chat &amp; Research</div>
+      <table class="docs-table">
+        <thead><tr><th>Endpoint</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>POST /api/auth/chat</td><td>Send a RAG chat message about a project</td></tr>
+          <tr><td>GET /api/auth/conversations</td><td>List all conversations</td></tr>
+          <tr><td>GET /api/auth/history</td><td>Get execution history</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Configuration -->
+    <div class="docs-section" id="configuration">
+      <div class="docs-heading" data-i18n="docs.configuration">Configuration</div>
+      <div class="docs-text">Noxen is configured via the <span class="docs-inline-code">.env</span> file. Key variables:</div>
+
+      <table class="docs-table">
+        <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>NOXEN_LICENSE_KEY</td><td>Your API key (from Dashboard or noxen auth)</td></tr>
+          <tr><td>OPENAI_API_KEY</td><td>OpenAI API key for Board deliberation</td></tr>
+          <tr><td>ANTHROPIC_API_KEY</td><td>Anthropic API key for Board deliberation</td></tr>
+          <tr><td>OLLAMA_BASE_URL</td><td>Ollama endpoint (default: http://localhost:11434)</td></tr>
+          <tr><td>QDRANT_URL</td><td>Qdrant vector database URL (default: http://localhost:6333)</td></tr>
+          <tr><td>NOXEN_HOST</td><td>Server bind address (default: 0.0.0.0)</td></tr>
+          <tr><td>NOXEN_PORT</td><td>Server port (default: 8400)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="docs-subheading">LLM Providers</div>
+      <div class="docs-text">The Noxen Board requires at least 2 LLM providers for deliberation. Configure providers in Settings or via the <span class="docs-inline-code">.env</span> file. Supported providers: OpenAI (GPT-4), Anthropic (Claude), Ollama (local models).</div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="docs-section" id="architecture">
+      <div class="docs-heading" data-i18n="docs.architecture">Architecture</div>
+      <div class="docs-text">Noxen consists of several core components working together:</div>
+
+      <div class="docs-subheading">Spider Analysis</div>
+      <div class="docs-text">Crawls your codebase detecting languages, frameworks, services, dependencies, and complexity metrics. Results are stored as reports.</div>
+
+      <div class="docs-subheading">Board Deliberation</div>
+      <div class="docs-text">Multiple LLM providers analyze your code independently, then deliberate to produce consensus-driven improvement plans.</div>
+
+      <div class="docs-subheading">Knowledge Base</div>
+      <div class="docs-text">Powered by Qdrant vector database. Your code is chunked, embedded, and indexed for semantic search during RAG chat and code generation.</div>
+
+      <div class="docs-subheading">Code Generation</div>
+      <div class="docs-text">Executes approved plans by writing code changes directly to your project files, with full audit trail in the execution history.</div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Smooth scroll for TOC links
+  document.querySelectorAll('.docs-nav a').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      var href = this.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        e.preventDefault();
+        var target = document.getElementById(href.substring(1));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        // Update active state
+        document.querySelectorAll('.docs-nav a').forEach(function(a) { a.classList.remove('active'); });
+        this.classList.add('active');
+      }
+    });
+  });
+
+  // Highlight active section on scroll
+  var sections = document.querySelectorAll('.docs-section');
+  var navLinks = document.querySelectorAll('.docs-nav a');
+  window.addEventListener('scroll', function() {
+    var scrollPos = window.scrollY + 100;
+    sections.forEach(function(section) {
+      if (section.offsetTop <= scrollPos && (section.offsetTop + section.offsetHeight) > scrollPos) {
+        navLinks.forEach(function(a) { a.classList.remove('active'); });
+        var active = document.querySelector('.docs-nav a[href="#' + section.id + '"]');
+        if (active) active.classList.add('active');
+      }
+    });
+  });
+</script>
+{% endblock %}

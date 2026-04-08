@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}Support{% endblock %}
+
+{% block extra_head %}
+<style>
+  .support-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; margin-bottom: 32px; background: rgba(91,64,62,0.1);
+  }
+  .support-card {
+    padding: 24px; background: var(--surface-low, #1c1b1b);
+    transition: background 150ms;
+  }
+  .support-card:hover { background: var(--surface-bright, #393939); }
+  .support-card-icon {
+    font-size: 24px; color: var(--primary-container, #ff5451);
+    margin-bottom: 12px;
+  }
+  .support-card-title {
+    font-size: 10px; font-weight: 800; letter-spacing: 0.2em;
+    text-transform: uppercase; color: #fff; margin-bottom: 8px;
+  }
+  .support-card-desc {
+    font-size: 12px; color: #71717a; line-height: 1.5; margin-bottom: 12px;
+  }
+  .support-card a {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--primary-container, #ff5451);
+    text-decoration: none; display: flex; align-items: center; gap: 4px;
+  }
+  .support-card a:hover { opacity: 0.8; }
+
+  .faq-section { margin-bottom: 32px; }
+  .faq-item {
+    border-bottom: 1px solid var(--outline, rgba(255,255,255,0.06));
+  }
+  .faq-question {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: #fff;
+    background: none; border: none; width: 100%;
+    text-align: left; font-family: 'Manrope', sans-serif;
+  }
+  .faq-question:hover { color: var(--primary-container, #ff5451); }
+  .faq-question .material-symbols-outlined {
+    font-size: 18px; color: #52525b; transition: transform 0.2s;
+  }
+  .faq-question.open .material-symbols-outlined {
+    transform: rotate(180deg);
+  }
+  .faq-answer {
+    display: none; padding: 0 0 16px 0;
+    font-size: 13px; color: #71717a; line-height: 1.7;
+  }
+  .faq-answer.visible { display: block; }
+  .faq-answer code {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--primary-container, #ff5451);
+    background: rgba(255,84,81,0.04); padding: 2px 6px;
+  }
+
+  .system-info {
+    background: var(--surface-low, #1c1b1b); padding: 24px;
+  }
+  .system-info-row {
+    display: flex; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 12px;
+  }
+  .system-info-row:last-child { border-bottom: none; }
+  .system-info-label { font-weight: 600; color: #e5e2e1; }
+  .system-info-value { color: #71717a; font-family: 'DM Mono', monospace; }
+
+  @media (max-width: 768px) {
+    .support-grid { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title" data-i18n="nav.support">Support</div>
+  <div class="page-desc" data-i18n="support.desc">Get help with Noxen. Browse FAQs, contact support, or report issues.</div>
+</div>
+
+<!-- Contact Cards -->
+<div class="section-label" data-i18n="support.get_help">Get Help</div>
+<div class="support-grid">
+  <div class="support-card">
+    <div class="support-card-icon">
+      <span class="material-symbols-outlined">email</span>
+    </div>
+    <div class="support-card-title" data-i18n="support.email_title">Email Support</div>
+    <div class="support-card-desc" data-i18n="support.email_desc">Send us an email and we'll get back to you within 24 hours.</div>
+    <a href="mailto:support@noxen.ai">support@noxen.ai &rarr;</a>
+  </div>
+  <div class="support-card">
+    <div class="support-card-icon">
+      <span class="material-symbols-outlined">bug_report</span>
+    </div>
+    <div class="support-card-title" data-i18n="support.bug_title">Report a Bug</div>
+    <div class="support-card-desc" data-i18n="support.bug_desc">Found an issue? Open a GitHub issue with reproduction steps.</div>
+    <a href="https://github.com/noxen-ai/noxen/issues" target="_blank"><span data-i18n="support.open_issue">Open Issue</span> &rarr;</a>
+  </div>
+  <div class="support-card">
+    <div class="support-card-icon">
+      <span class="material-symbols-outlined">forum</span>
+    </div>
+    <div class="support-card-title" data-i18n="support.community_title">Community</div>
+    <div class="support-card-desc" data-i18n="support.community_desc">Join the community to discuss features, share tips, and get help.</div>
+    <a href="https://github.com/noxen-ai/noxen/discussions" target="_blank"><span data-i18n="support.discussions">Discussions</span> &rarr;</a>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="section-label" data-i18n="support.faq">Frequently Asked Questions</div>
+<div class="faq-section">
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      How do I authenticate the CLI?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      Run <code>noxen auth</code> in your terminal. A browser window will open where you can sign in or create an account. The CLI will automatically receive your credentials once authorized.
+    </div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      How do I register a project?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      Navigate to your project directory and run <code>noxen project add .</code> to register it. Then run <code>noxen start</code> to generate your first Spider Analysis report.
+    </div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      What LLM providers are supported?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      Noxen supports OpenAI, Anthropic, and Ollama. The Board deliberation system requires at least 2 providers configured. Go to Settings to configure your API keys.
+    </div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      How do I generate code from a plan?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      First generate a report with <code>noxen start</code>, then create an action plan from the report detail page. Once the plan is approved, run <code>noxen generate-code</code> in your terminal to execute it.
+    </div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      What is the difference between Developer and Team plans?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      The Developer plan is for individual use with basic features. The Team plan includes multi-user access, advanced analytics, priority support, unlimited research sessions, and higher project limits.
+    </div>
+  </div>
+  <div class="faq-item">
+    <button class="faq-question" onclick="toggleFaq(this)">
+      How do I update my API key?
+      <span class="material-symbols-outlined">expand_more</span>
+    </button>
+    <div class="faq-answer">
+      Go to Dashboard and click "Generate New Key" in the Authentication section. Copy the new key immediately as it is only shown once. Update your <code>.env</code> file with the new key.
+    </div>
+  </div>
+</div>
+
+<!-- System Info -->
+<div class="section-label" data-i18n="support.system_info">System Information</div>
+<div class="system-info">
+  <div class="system-info-row">
+    <span class="system-info-label" data-i18n="account.version">Version</span>
+    <span class="system-info-value">v0.3.0-stable</span>
+  </div>
+  <div class="system-info-row">
+    <span class="system-info-label" data-i18n="nav.account">Account</span>
+    <span class="system-info-value" id="support-email">-</span>
+  </div>
+  <div class="system-info-row">
+    <span class="system-info-label" data-i18n="home.current_plan">Plan</span>
+    <span class="system-info-value" id="support-plan">-</span>
+  </div>
+  <div class="system-info-row">
+    <span class="system-info-label" data-i18n="home.license_exp">License Expires</span>
+    <span class="system-info-value" id="support-expires">-</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function toggleFaq(btn) {
+    var answer = btn.nextElementSibling;
+    var isOpen = answer.classList.contains('visible');
+    // Close all
+    document.querySelectorAll('.faq-answer').forEach(function(a) { a.classList.remove('visible'); });
+    document.querySelectorAll('.faq-question').forEach(function(q) { q.classList.remove('open'); });
+    // Toggle current
+    if (!isOpen) {
+      answer.classList.add('visible');
+      btn.classList.add('open');
+    }
+  }
+
+  document.addEventListener('noxen:user-loaded', function(e) {
+    var me = e.detail;
+    var el = document.getElementById('support-email');
+    if (el) el.textContent = me.email || '-';
+  });
+
+  document.addEventListener('noxen:license-loaded', function(e) {
+    var lic = e.detail;
+    var plan = lic.plan_name || 'developer';
+    var canonicalMap = {free:'Developer', pro:'Developer', enterprise:'Team', developer:'Developer', team:'Team'};
+    var planEl = document.getElementById('support-plan');
+    if (planEl) planEl.textContent = canonicalMap[plan] || plan;
+    var expEl = document.getElementById('support-expires');
+    if (expEl) expEl.textContent = lic.expires_at
+      ? new Date(lic.expires_at).toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})
+      : 'Never';
+  });
+</script>
+{% endblock %}

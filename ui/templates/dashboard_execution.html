@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Execution{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://unpkg.com/alpinejs@3/dist/cdn.min.js"></script>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    corePlugins: { preflight: false },
+    theme: {
+      extend: {
+        colors: {
+          "surface-container-highest": "#353534",
+          "surface-container": "#201f1f",
+          "surface-container-high": "#2a2a2a",
+          "surface-container-low": "#1c1b1b",
+          "surface-container-lowest": "#0e0e0e",
+          "surface-dim": "#131313",
+          "surface-bright": "#393939",
+          "primary-container": "#ff5451",
+          "primary": "#ffb3ad",
+          "on-surface": "#e5e2e1",
+          "on-surface-variant": "#e4beba",
+          "outline-variant": "#5b403e",
+          "tertiary": "#69d8d4",
+          void:    { DEFAULT: '#131313', 2: '#1c1b1b', 3: '#201f1f' },
+          shigh:   '#2a2a2a',
+          shighest:'#353534',
+          ember:   { DEFAULT: '#ff5451', glow: '#ffb3ad' },
+          frost:   '#e5e2e1',
+          muted:   '#6b7280',
+          outline: 'rgba(255,255,255,0.06)',
+        },
+        fontFamily: { "headline": ["Manrope"], "body": ["Manrope"] },
+        borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+      }
+    }
+  }
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title" data-i18n="nav.execution">Execution</div>
+  <div class="page-desc" data-i18n="execution.desc">Orchestration engine control. Launch sessions, approve plans, and monitor execution progress.</div>
+</div>
+
+<div x-data="executionComponent()" x-init="init()">
+  <!-- Start Form -->
+  <div class="noxen-card p-5 mb-6">
+    <h3 class="section-label" data-i18n="execution.launch_session">Launch Session</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <input x-model="projectPath" type="text" data-i18n-placeholder="autoresearch.project_path_ph" placeholder="Project path (e.g. /Users/luigi/my-project)" class="noxen-input">
+      <input x-model="projectName" type="text" data-i18n-placeholder="execution.project_name_ph" placeholder="Project name" class="noxen-input">
+      <div class="flex gap-2">
+        <button @click="startEngine()" :disabled="starting || !projectPath" class="btn-kinetic flex-1">
+          <span x-show="!starting" data-i18n="execution.start_engine">Start Engine</span>
+          <span x-show="starting" data-i18n="execution.starting">Starting...</span>
+        </button>
+        <button @click="stopEngine()" x-show="sessionStatus?.running" class="btn-outline text-red-400 border-red-400/30 hover:border-red-400" data-i18n="execution.stop">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval Banner -->
+  <div x-show="approvalPending" class="noxen-card-ember p-4 mb-6">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-ember">pending_actions</span>
+        <div>
+          <h3 class="text-sm font-bold text-white" data-i18n="execution.plan_awaiting">Plan Awaiting Approval</h3>
+          <p class="text-xs text-muted mt-0.5" data-i18n="execution.plan_awaiting_desc">Review the generated plan before execution proceeds.</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button @click="approveAll()" class="btn-kinetic text-xs" data-i18n="execution.approve">Approve</button>
+        <button @click="rejectPlan()" class="btn-outline text-xs text-red-400 border-red-400/30" data-i18n="execution.reject">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Goals -->
+    <div class="noxen-card p-4">
+      <h3 class="section-label" data-i18n="execution.goals">Goals</h3>
+      <div class="space-y-2 max-h-80 overflow-y-auto">
+        <template x-for="(goal, i) in goals" :key="i">
+          <div class="flex items-center gap-2 text-xs bg-void rounded-lg p-2.5">
+            <span :class="goalStatusColor(goal.status)" x-text="goalStatusIcon(goal.status)"></span>
+            <span class="text-white" x-text="goal.title || goal.description || 'Goal ' + (i+1)"></span>
+          </div>
+        </template>
+        <div x-show="goals.length === 0" class="text-xs text-muted text-center py-4" data-i18n="execution.no_goals">No goals yet</div>
+      </div>
+    </div>
+
+    <!-- SSE Log -->
+    <div class="noxen-card p-4">
+      <h3 class="section-label" data-i18n="execution.log">Execution Log</h3>
+      <div class="space-y-1 max-h-80 overflow-y-auto">
+        <template x-for="(entry, i) in sseLog" :key="i">
+          <div class="log-line flex gap-2">
+            <span class="text-ember" x-text="entry.time"></span>
+            <span :class="{'text-green-400': entry.type==='success', 'text-red-400': entry.type==='error', 'text-yellow-400': entry.type==='warning', 'text-muted': entry.type==='info'}" x-text="entry.message"></span>
+          </div>
+        </template>
+        <div x-show="sseLog.length === 0" class="text-xs text-muted text-center py-4" data-i18n="execution.engine_idle">Engine idle</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/api.js"></script>
+<script src="/static/js/sse.js"></script>
+<script src="/static/js/components/execution.js"></script>
+{% endblock %}

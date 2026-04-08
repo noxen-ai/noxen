@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Noxen — {% block title %}Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css?v=11">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <div class="layout">
+
+    <!-- ═══ Sidebar ═══ -->
+    <aside class="sidebar">
+      <div class="sidebar-logo-group">
+        <a href="/" style="text-decoration:none">
+          <img src="/static/img/logo.svg" alt="Noxen" style="height:32px;display:block">
+        </a>
+      </div>
+      <nav class="sidebar-nav" style="margin-top:16px">
+        <a class="nav-item-noxen{% if active_nav == 'home' %} active{% endif %}" href="/">
+          <span class="material-symbols-outlined">hub</span> <span>Dashboard</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'chat' %} active{% endif %}" href="/chat">
+          <span class="material-symbols-outlined">chat</span> <span>Chat</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'research' %} active{% endif %}" href="/research">
+          <span class="material-symbols-outlined">manage_search</span> <span>Research</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'skills' %} active{% endif %}" href="/skills">
+          <span class="material-symbols-outlined">psychology</span> <span>Skills</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'agents' %} active{% endif %}" href="/agents">
+          <span class="material-symbols-outlined">smart_toy</span> <span>Agents</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'board' %} active{% endif %}" href="/board">
+          <span class="material-symbols-outlined">groups</span> <span>Board</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'execution' %} active{% endif %}" href="/execution">
+          <span class="material-symbols-outlined">rocket_launch</span> <span>Execution</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'notifications' %} active{% endif %}" href="/notifications">
+          <span class="material-symbols-outlined">notifications</span> <span>Notifications</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'projects' %} active{% endif %}" href="/projects">
+          <span class="material-symbols-outlined">deployed_code</span> <span>Projects</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'reports' %} active{% endif %}" href="/reports">
+          <span class="material-symbols-outlined">analytics</span> <span>Reports</span>
+        </a>
+        <a class="nav-item-noxen{% if active_nav == 'settings' %} active{% endif %}" href="/settings">
+          <span class="material-symbols-outlined">settings</span> <span>Settings</span>
+        </a>
+        <div class="sidebar-spacer"></div>
+        <a class="nav-item-noxen{% if active_nav == 'admin' %} active{% endif %}" id="nav-admin" href="/admin" style="display:none">
+          <span class="material-symbols-outlined">security</span> <span>Admin</span>
+        </a>
+      </nav>
+      <div class="sidebar-status">
+        <div class="sidebar-status-label">System Status: Nominal</div>
+        <a href="/docs" class="sidebar-status-item">
+          <span class="material-symbols-outlined">description</span>
+          <span>Documentation</span>
+        </a>
+        <a href="/support" class="sidebar-status-item">
+          <span class="material-symbols-outlined">help_center</span>
+          <span>Support</span>
+        </a>
+      </div>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-dropdown">
+          <div class="sidebar-user">
+            <div class="sidebar-avatar" id="user-avatar">?</div>
+            <div class="sidebar-user-info">
+              <span class="sidebar-email" id="sidebar-email"></span>
+            </div>
+            <span class="material-symbols-outlined" style="font-size:16px;color:#52525b;margin-left:auto">expand_less</span>
+          </div>
+          <div class="sidebar-dropdown-menu">
+            <a href="/account" class="sidebar-dropdown-item">
+              <span class="material-symbols-outlined">person</span> <span>Account</span>
+            </a>
+            <button class="sidebar-dropdown-item" onclick="doLogout()">
+              <span class="material-symbols-outlined">logout</span> <span>Logout</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══ Main ═══ -->
+    <div class="main-scroll">
+
+      <!-- Header -->
+      <header class="app-header">
+        <div class="breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+        <div class="header-right">
+          <div class="header-status-wrap">
+            <span class="status-dot online" id="status-dot"></span>
+          </div>
+          <span class="badge-noxen badge-ember" id="plan-badge">Developer</span>
+          <span class="badge-noxen badge-muted">v0.3.0</span>
+        </div>
+      </header>
+
+      <div class="content">
+        {% block content %}{% endblock %}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ Shared Auth JS ═══ -->
+  <script>
+    // Pick up session_token from URL param
+    (function() {
+      var p = new URLSearchParams(window.location.search);
+      var t = p.get('session_token');
+      if (t) {
+        localStorage.setItem('noxen_session_token', t);
+        // Clean URL
+        var clean = window.location.pathname;
+        window.history.replaceState({}, '', clean);
+      }
+    })();
+    var TOKEN = localStorage.getItem('noxen_session_token');
+    if (!TOKEN) {
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    var headers = { 'X-Session-Token': TOKEN };
+
+    async function loadUser() {
+      try {
+        var res = await fetch('/api/auth/me', { headers: headers });
+        if (!res.ok) throw new Error('Not authenticated');
+        var me = await res.json();
+
+        var emailEl = document.getElementById('sidebar-email');
+        if (emailEl) emailEl.textContent = me.email;
+        var avatarEl = document.getElementById('user-avatar');
+        if (avatarEl) avatarEl.textContent = (me.name || me.email || '?').substring(0, 2).toUpperCase();
+
+        if (me.is_superadmin) {
+          var adminNav = document.getElementById('nav-admin');
+          if (adminNav) adminNav.style.display = '';
+        }
+
+        // Dispatch event for child pages
+        window._noxenUser = me;
+        document.dispatchEvent(new CustomEvent('noxen:user-loaded', { detail: me }));
+      } catch (e) {
+        localStorage.removeItem('noxen_session_token');
+        document.cookie = 'noxen_session=; path=/; max-age=0';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    }
+
+    async function loadPlanBadge() {
+      try {
+        var res = await fetch('/api/tenants/license', { headers: headers });
+        if (!res.ok) return;
+        var lic = await res.json();
+
+        var plan = lic.plan_name || 'developer';
+        var canonicalMap = {free:'Developer', pro:'Developer', enterprise:'Team', developer:'Developer', team:'Team'};
+        var planUpper = canonicalMap[plan] || plan.charAt(0).toUpperCase() + plan.slice(1);
+
+        var badge = document.getElementById('plan-badge');
+        if (badge) {
+          badge.textContent = planUpper;
+          badge.className = (plan === 'team' || plan === 'enterprise')
+            ? 'badge-noxen badge-ember'
+            : 'badge-noxen badge-green';
+        }
+
+        window._noxenLicense = lic;
+        document.dispatchEvent(new CustomEvent('noxen:license-loaded', { detail: lic }));
+      } catch (e) { /* silent */ }
+    }
+
+    async function doLogout() {
+      await fetch('/api/auth/logout', { method: 'POST', headers: headers }).catch(function() {});
+      localStorage.removeItem('noxen_session_token');
+      localStorage.removeItem('noxen_api_key');
+      document.cookie = 'noxen_session=; path=/; max-age=0';
+      window.location.href = '/login';
+    }
+
+    // Init shared
+    loadUser();
+    loadPlanBadge();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+
+</body>
+</html>

@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}Skills{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="section-label" data-i18n="skills.catalog_label">SKILLS CATALOG</div>
+    <h1 class="page-title" data-i18n="skills.title">Global Knowledge Base</h1>
+    <p class="page-desc" id="page-subtitle" data-i18n="common.loading">Loading skills...</p>
+  </div>
+</div>
+
+<div class="filters-bar">
+  <input type="text" id="search-input" class="noxen-input" placeholder="Search skills..." oninput="filterSkills()">
+  <select id="category-filter" class="noxen-input" onchange="filterSkills()">
+    <option value="" data-i18n="skills.all_categories">All Categories</option>
+  </select>
+  <select id="type-filter" class="noxen-input" onchange="filterSkills()">
+    <option value="" data-i18n="skills.all_types">All Types</option>
+    <option value="skill" data-i18n="nav.skills">Skills</option>
+    <option value="command" data-i18n="skills.commands">Commands</option>
+  </select>
+  <button onclick="loadSkills()" class="btn-outline">&circlearrowleft; <span data-i18n="home.refresh">Refresh</span></button>
+</div>
+
+<div class="overview-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">database</span>
+      <span data-i18n="skills.total">Total</span>
+    </div>
+    <div class="overview-value" id="total-count">-</div>
+    <div class="overview-meta"><span id="total-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">psychology</span>
+      <span data-i18n="nav.skills">Skills</span>
+    </div>
+    <div class="overview-value" id="skills-total">-</div>
+    <div class="overview-meta"><span id="skills-label">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">smart_toy</span>
+      <span data-i18n="nav.agents">Agents</span>
+    </div>
+    <div class="overview-value" id="agents-total">-</div>
+    <div class="overview-meta"><span id="agents-label" data-i18n="common.loading">Loading...</span></div>
+  </div>
+  <div class="overview-card">
+    <div class="overview-icon">
+      <span class="material-symbols-outlined">category</span>
+      <span data-i18n="skills.categories">Categories</span>
+    </div>
+    <div class="overview-value" id="categories-count">-</div>
+    <div class="overview-meta"><span id="categories-label">Loading...</span></div>
+  </div>
+</div>
+
+<div class="stats-bar">
+  <span id="showing-count">Showing 0 skills</span>
+</div>
+
+<div id="skills-list" class="skills-list"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var sessionToken = localStorage.getItem('noxen_session_token');
+  var allItems = [];
+  var filtered = [];
+
+  function cleanPlugin(plugin) {
+    if (!plugin) return 'GLOBAL';
+    return plugin
+      .replace(/^collections\//, '')
+      .replace(/claude-code-plugins-plus-skills\/plugins\//, '')
+      .replace(/claude-code-plugins-plus-skills\//, '')
+      .split('/')[0]
+      .toUpperCase()
+      .replace(/-/g, ' ')
+      .slice(0, 30);
+  }
+
+  async function loadSkills() {
+    var list = document.getElementById('skills-list');
+    list.textContent = '';
+    var loadRow = document.createElement('div');
+    loadRow.className = 'skill-row';
+    loadRow.style.color = '#4a4a4a';
+    loadRow.textContent = 'Loading...';
+    list.appendChild(loadRow);
+
+    try {
+      var r = await fetch('/api/auth/kb/skills?limit=5000', {
+        headers: { 'X-Session-Token': sessionToken }
+      });
+      if (r.status === 401) { window.location.href = '/login'; return; }
+      var data = await r.json();
+
+      allItems = [].concat(data.skills || [], data.commands || []);
+
+      updateStats(data);
+      populateFilters(allItems);
+      filterSkills();
+    } catch(e) {
+      list.textContent = '';
+      var errRow = document.createElement('div');
+      errRow.className = 'skill-row';
+      errRow.style.color = '#ff5451';
+      errRow.textContent = 'Error loading skills: ' + e.message;
+      list.appendChild(errRow);
+    }
+  }
+
+  function filterSkills() {
+    var search = document.getElementById('search-input').value.toLowerCase();
+    var category = document.getElementById('category-filter').value.toLowerCase();
+    var type = document.getElementById('type-filter').value.toLowerCase();
+
+    filtered = allItems.filter(function(s) {
+      var searchable = (s.name + ' ' + s.description + ' ' + s.tags + ' ' + s.plugin).toLowerCase();
+      var matchSearch = !search || searchable.indexOf(search) !== -1;
+      var matchCategory = !category || (s.plugin || '').toLowerCase().indexOf(category) !== -1;
+      var matchType = !type || s.type === type;
+      return matchSearch && matchCategory && matchType;
+    });
+
+    renderSkills(filtered);
+    document.getElementById('showing-count').textContent = 'Showing ' + filtered.length + ' skills';
+  }
+
+  function renderSkills(items) {
+    var list = document.getElementById('skills-list');
+    list.textContent = '';
+
+    if (items.length === 0) {
+      var empty = document.createElement('div');
+      empty.className = 'skill-row';
+      empty.style.color = '#4a4a4a';
+      empty.style.justifyContent = 'center';
+      empty.style.padding = '32px';
+      empty.textContent = 'No skills found';
+      list.appendChild(empty);
+      return;
+    }
+
+    items.forEach(function(s) {
+      var row = document.createElement('div');
+      row.className = 'skill-row';
+
+      var left = document.createElement('div');
+      left.className = 'skill-row-left';
+
+      var badge = document.createElement('span');
+      badge.className = 'skill-category-badge';
+      badge.textContent = cleanPlugin(s.plugin);
+      left.appendChild(badge);
+
+      var name = document.createElement('span');
+      name.className = 'skill-row-name';
+      name.textContent = s.name || 'Unnamed';
+      left.appendChild(name);
+
+      var desc = s.description && s.description !== '|' ? s.description : '';
+      if (desc) {
+        var descEl = document.createElement('span');
+        descEl.className = 'skill-row-desc';
+        descEl.textContent = '\u2014 ' + desc.slice(0, 80);
+        left.appendChild(descEl);
+      }
+
+      row.appendChild(left);
+
+      var right = document.createElement('div');
+      right.className = 'skill-row-right';
+      (s.tags || '').split(',').filter(function(t) { return t.trim(); }).slice(0, 3).forEach(function(t) {
+        var tag = document.createElement('span');
+        tag.className = 'skill-tag';
+        tag.textContent = t.trim();
+        right.appendChild(tag);
+      });
+      row.appendChild(right);
+
+      list.appendChild(row);
+    });
+  }
+
+  function updateStats(data) {
+    var total = data.total || 0;
+    var skills = data.skills_count || 0;
+    var agents = data.agents_count || 0;
+
+    var totalEl = document.getElementById('total-count');
+    var skillsEl = document.getElementById('skills-total');
+    var agentsEl = document.getElementById('agents-total');
+
+    if (totalEl) totalEl.textContent = total.toLocaleString();
+    if (skillsEl) skillsEl.textContent = skills.toLocaleString();
+    if (agentsEl) agentsEl.textContent = agents.toLocaleString();
+
+    var totalLabel = document.getElementById('total-label');
+    var skillsLabel = document.getElementById('skills-label');
+    var agentsLabel = document.getElementById('agents-label');
+
+    if (totalLabel) { totalLabel.textContent = 'Items in KB'; totalLabel.className = total > 0 ? 'active' : ''; }
+    if (skillsLabel) { skillsLabel.textContent = skills > 0 ? 'Available' : 'None yet'; skillsLabel.className = skills > 0 ? 'active' : ''; }
+    if (agentsLabel) { agentsLabel.textContent = agents > 0 ? 'Available' : 'None yet'; agentsLabel.className = agents > 0 ? 'active' : ''; }
+
+    document.getElementById('page-subtitle').textContent =
+      'Search through ' + total.toLocaleString() + ' items';
+  }
+
+  function populateFilters(items) {
+    var pluginSet = {};
+    items.forEach(function(s) {
+      var p = cleanPlugin(s.plugin);
+      pluginSet[p] = true;
+    });
+    var plugins = Object.keys(pluginSet).sort();
+
+    var select = document.getElementById('category-filter');
+    while (select.options.length > 0) select.remove(0);
+    var defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = 'All Categories';
+    select.appendChild(defOpt);
+    plugins.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p.toLowerCase();
+      opt.textContent = p;
+      select.appendChild(opt);
+    });
+
+    document.getElementById('categories-count').textContent = plugins.length;
+    var catLabel = document.getElementById('categories-label');
+    if (catLabel) { catLabel.textContent = 'Unique plugins'; catLabel.className = plugins.length > 0 ? 'active' : ''; }
+  }
+
+  document.addEventListener('DOMContentLoaded', loadSkills);
+</script>
+{% endblock %}

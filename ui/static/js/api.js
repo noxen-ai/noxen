@@ -8,7 +8,10 @@ const NoxenAPI = {
 
   async _fetch(path, opts = {}) {
     const url = this._base + path;
-    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+    const h = { 'Content-Type': 'application/json' };
+    const apiKey = localStorage.getItem('noxen_api_key');
+    if (apiKey) h['Authorization'] = 'Bearer ' + apiKey;
+    const headers = { ...h, ...(opts.headers || {}) };
     const res = await fetch(url, { ...opts, headers });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -54,6 +57,9 @@ const NoxenAPI = {
 
   // ── Board (events-based) ────────────────────
   boardDecisions(limit = 50) { return this.get(`/api/events/recent?limit=${limit}`); },
+  boardQuery(prompt, system = '', boardMode = 'sync') {
+    return this.post('/api/board/query', { prompt, system, board_mode: boardMode });
+  },
 
   // ── Execution Engine ────────────────────────
   engineStart(projectPath, projectName)   { return this.post('/api/engine/start', { project_path: projectPath, project_name: projectName }); },
@@ -72,21 +78,12 @@ const NoxenAPI = {
   // ── Events ──────────────────────────────────
   recentEvents(limit = 30)   { return this.get(`/api/events/recent?limit=${limit}`); },
 
-  // ── Settings ────────────────────────────────
-  getSettings()              { return this.get('/api/settings'); },
-  getProviders()             { return this.get('/api/settings/providers'); },
-  saveSettings(data)         { return this.post('/api/settings', data); },
-
-  // ── Admin ───────────────────────────────────
-  adminListTenants()                      { return this.get('/api/admin/tenants/'); },
-  adminCreateTenant(data)                 { return this.post('/api/admin/tenants/', data); },
-  adminDeleteTenant(id)                   { return this.del(`/api/admin/tenants/${id}`); },
-  adminCreateApiKey(tenantId, keyName)    { return this.post(`/api/admin/tenants/${tenantId}/api-keys`, { key_name: keyName }); },
-  adminTenantUsage(tenantId)              { return this.get(`/api/admin/tenants/${tenantId}/usage`); },
-
   // ── Qdrant ──────────────────────────────────
   qdrantStats()              { return this.get('/api/knowledge/status'); },
 
   // ── Projects ────────────────────────────────
   projects()                 { return this.get('/api/projects/'); },
+
+  // ── LLM Models ─────────────────────────────
+  llmModels()                { return this.get('/api/models'); },
 };

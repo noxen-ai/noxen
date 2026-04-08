@@ -43,3 +43,5 @@ hetzcl.pub
 .neural-hub/
 .neural/
 .noxen/
+.claude/
+global_knowledge_export.json

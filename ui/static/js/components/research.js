@@ -4,7 +4,8 @@
 function researchComponent() {
   return {
     query: '',
-    context: '',
+    selectedProject: '',
+    projects: [],
     triggering: false,
     status: null,
     pendingSkills: [],
@@ -12,9 +13,17 @@ function researchComponent() {
 
     async init() {
       await Promise.allSettled([
+        this.loadProjects(),
         this.loadStatus(),
         this.loadPendingSkills(),
       ]);
+    },
+
+    async loadProjects() {
+      try {
+        var data = await NoxenAPI.projects();
+        this.projects = data?.projects || [];
+      } catch(e) { this.projects = []; }
     },
 
     async loadStatus() {
@@ -34,7 +43,8 @@ function researchComponent() {
       this.researchLog = [];
       this.addLog('info', `Starting research: ${this.query}`);
       try {
-        const result = await NoxenAPI.researchTrigger(this.query, this.context);
+        var context = this.selectedProject ? 'Project: ' + this.selectedProject : '';
+        const result = await NoxenAPI.researchTrigger(this.query, context);
         this.addLog('success', `Research completed: ${result?.skills_found || 0} skills found`);
         await this.loadPendingSkills();
       } catch (e) {
