@@ -1,86 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <linearGradient id="ember" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff6b68"/>
-      <stop offset="100%" stop-color="#ff5451"/>
-    </linearGradient>
-    <linearGradient id="emberGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ff5451" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#ff5451" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-
   <!-- Background -->
-  <rect width="512" height="512" rx="80" fill="#131313"/>
+  <rect width="512" height="512" rx="96" fill="#131313"/>
 
-  <!-- Subtle grid pattern for tech feel -->
-  <g opacity="0.04" stroke="#ffffff" stroke-width="0.5">
-    <line x1="128" y1="0" x2="128" y2="512"/>
-    <line x1="256" y1="0" x2="256" y2="512"/>
-    <line x1="384" y1="0" x2="384" y2="512"/>
-    <line x1="0" y1="128" x2="512" y2="128"/>
-    <line x1="0" y1="256" x2="512" y2="256"/>
-    <line x1="0" y1="384" x2="512" y2="384"/>
+  <!-- N + dot from the original Noxen wordmark, exact same paths and proportions -->
+  <!-- Original N: 76-701 x 0-700. Dot placed right after at baseline. -->
+  <!-- Combined bounds: ~76-960 x -10-700 → centered and scaled into 512x512 -->
+  <g transform="translate(256, 256) scale(0.44, -0.44) translate(-490, -345)">
+    <!-- N letterform (exact logo path) -->
+    <path d="M538 700H701V0H554L237 433L239 244V0H76V700H223L540 265L538 452Z" fill="#ffffff"/>
+    <!-- Signature dot (exact logo path, repositioned after N) -->
+    <g transform="translate(700, 0)">
+      <path d="M43 75Q43 112 68.5 136.0Q94 160 134 160Q173 160 198.5 136.0Q224 112 224 75Q224 38 198.5 14.0Q173 -10 134 -10Q94 -10 68.5 14.0Q43 38 43 75Z" fill="#ff5451"/>
+    </g>
   </g>
-
-  <!-- Neural circuit lines (subtle background detail) -->
-  <g opacity="0.08" stroke="#ff5451" stroke-width="1.5" fill="none">
-    <!-- Top-left circuit trace -->
-    <path d="M 100 140 L 140 140 L 140 110"/>
-    <!-- Bottom-right circuit trace -->
-    <path d="M 412 372 L 372 372 L 372 402"/>
-    <!-- Left vertical trace -->
-    <path d="M 108 200 L 108 312"/>
-    <!-- Right vertical trace -->
-    <path d="M 404 200 L 404 312"/>
-  </g>
-
-  <!-- Neural nodes on circuit traces -->
-  <g opacity="0.12" fill="#ff5451">
-    <circle cx="100" cy="140" r="3"/>
-    <circle cx="140" cy="110" r="2.5"/>
-    <circle cx="412" cy="372" r="3"/>
-    <circle cx="372" cy="402" r="2.5"/>
-    <circle cx="108" cy="200" r="2"/>
-    <circle cx="108" cy="312" r="2"/>
-    <circle cx="404" cy="200" r="2"/>
-    <circle cx="404" cy="312" r="2"/>
-  </g>
-
-  <!-- Code bracket hints (very subtle) -->
-  <g opacity="0.06" stroke="#ff5451" stroke-width="2.5" fill="none" stroke-linecap="round">
-    <!-- Left bracket < -->
-    <path d="M 96 236 L 80 256 L 96 276"/>
-    <!-- Right bracket > -->
-    <path d="M 416 236 L 432 256 L 416 276"/>
-  </g>
-
-  <!-- The "N" letterform - bold geometric style -->
-  <g filter="url(#glow)">
-    <path d="
-      M 152 370 L 152 142
-      L 192 142
-      L 192 280
-      L 320 142
-      L 360 142
-      L 360 370
-      L 320 370
-      L 320 232
-      L 192 370
-      Z
-    " fill="url(#ember)"/>
-  </g>
-
-  <!-- Signature red dot - positioned at top-right of the N -->
-  <circle cx="382" cy="134" r="10" fill="#ff5451" opacity="0.9"/>
-
-  <!-- Subtle inner highlight on the dot -->
-  <circle cx="379" cy="131" r="3.5" fill="#ff8a88" opacity="0.5"/>
 </svg>
